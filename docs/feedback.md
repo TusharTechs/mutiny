@@ -63,3 +63,42 @@ device. A one-line note in the quickstart ("behind a TLS-inspecting proxy, point
 `SSL_CERT_FILE` at a bundle that includes your organisation's CA") would save
 that hour. MUTINY now merges certifi with the system keychain automatically —
 see `mutiny/tls.py`.
+
+## A truncated reasoning trace returns a completely empty response
+
+The sharpest issue we hit, and the most expensive.
+
+When a Nemotron 3 response is cut off by `max_tokens` while the model is still
+reasoning, the API returns `finish_reason: "length"` with **both** `content` and
+`reasoning` empty — zero characters in each — while billing the full completion
+allowance. There is no error and no partial output. From the caller's side a
+paid-for request is indistinguishable from one that returned nothing at all.
+
+We reproduced it in isolation on `nemotron-3-super-120b-a12b`:
+
+| prompt | max_tokens | temperature | content | reasoning | billed |
+|---|---:|---:|---:|---:|---:|
+| 706 tokens | 4000 | 0.0 | 0 ch | 0 ch | 4000 |
+| 706 tokens | 4000 | 0.3 | 0 ch | 0 ch | 4000 |
+| 706 tokens | 4000 | 0.7 | 0 ch | 0 ch | 4000 |
+| 706 tokens | 12000 | 0.0 | 0 ch | 0 ch | 12000 |
+
+A 706-token prompt, so this is not a context-length problem. It is also stable
+across temperature, which is itself surprising.
+
+The natural remedy — retry with a larger allowance — makes it worse, since each
+retry bills in full and returns the same nothing. We now detect the signature
+(truncated, `reasoning` empty, `content` empty) and abandon the request rather
+than widening, because widening measurably never helps.
+
+Two suggestions:
+
+1. Return the partial reasoning rather than discarding it. Even an unterminated
+   trace tells the caller what happened, and would have saved us several hours.
+2. Failing that, a distinct `finish_reason` for "the allowance was consumed
+   before any output could be emitted" would make this diagnosable instead of
+   looking like an empty model response.
+
+We also could not find any way to disable reasoning for high-volume calls, which
+compounds this: `chat_template_kwargs={"thinking": False}` is silently ignored
+and `/no_think` lengthens the trace.

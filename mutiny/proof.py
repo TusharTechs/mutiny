@@ -51,9 +51,60 @@ It sits in `{function}`. Bug class: {bug_class}.
 
 Write the test that catches it."""
 
-RETRY = """That test was rejected. {reason}
+RETRY = """That test was rejected.
 
-Write a different test that fixes this. Same requirements as before."""
+{reason}
+
+{guidance}
+
+Write a different test. Same requirements as before."""
+
+
+def retry_guidance(failures) -> str:
+    """Say what to do differently, not just what went wrong.
+
+    Reporting `verdicts=['passed']` to the model wasted two of its three attempts:
+    it could see the test had failed the gate but not why the assertion was at
+    fault. Naming the specific weakness is the difference between a retry and a
+    re-roll.
+    """
+    notes: list[str] = []
+    for rule in failures:
+        name, detail = rule.name, rule.detail
+        if name.startswith("1 "):
+            notes.append(
+                "Your test does not pass on the current, unmodified code, so it is "
+                "simply wrong about how this code behaves. Re-read the existing "
+                "tests above and follow exactly how they import, set up and call it."
+            )
+        elif name.startswith("2 "):
+            if "passed" in detail:
+                notes.append(
+                    "Your test passed on the changed version too, so the assertion "
+                    "cannot tell the two apart. A prefix, substring, truthiness, "
+                    "length or type check is too weak here — capture the value the "
+                    "function returns and assert on it exactly and in full."
+                )
+            else:
+                notes.append(
+                    "Your test did fail on the changed version, but by raising an "
+                    "exception rather than by an assertion failing. Catch whatever "
+                    "is raised, reduce it to a value, and assert on that value."
+                )
+        elif name.startswith("3"):
+            notes.append(f"Rewrite it without that: {detail}")
+        elif name.startswith("5 "):
+            notes.append(
+                "Your test depends on internal structure rather than behaviour — it "
+                "breaks when local variables are renamed. Assert on what the "
+                "function returns, not on how it is written."
+            )
+        elif name.startswith("6 "):
+            notes.append(
+                "Your test gave different results on repeated runs. Remove anything "
+                "non-deterministic: clocks, randomness, iteration order, the network."
+            )
+    return "\n\n".join(dict.fromkeys(notes)) or "Try a different approach."
 
 COVERING = """These existing tests already execute the mutated line. Every one of them still
 passes after the mutation — that is exactly the gap you are closing. They also
@@ -167,7 +218,8 @@ def generate_proof_test(
         reason = "; ".join(f"{r.name}: {r.detail or 'failed'}" for r in gate.failures)
         messages = messages + [
             {"role": "assistant", "content": text},
-            {"role": "user", "content": RETRY.format(reason=reason)},
+            {"role": "user", "content": RETRY.format(
+                reason=reason, guidance=retry_guidance(gate.failures))},
         ]
 
     return attempts

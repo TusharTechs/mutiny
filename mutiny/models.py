@@ -259,6 +259,14 @@ class NemotronClient:
             )
             if not call.truncated or text.strip():
                 return text, call
+            if call.reasoning_chars == 0:
+                # Truncated with BOTH fields empty. The model did generate — the
+                # full allowance is billed — but a reasoning block cut off before
+                # it closes is discarded server side, taking the answer with it.
+                # Widening does not help: measured identical at 3k, 4k, 6k and
+                # 12k tokens, and across temperatures. Stop paying for it.
+                self.last_widened_to = budget
+                return text, call
             self.last_widened_to = budget
             budget *= 2
         assert call is not None
