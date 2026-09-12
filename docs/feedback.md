@@ -55,7 +55,7 @@ how much to fan out.
 
 ## Environment (not a Nebius issue, recorded for completeness)
 
-Building from a corporate laptop behind corporate TLS inspection, every Python,
+Building from a managed laptop behind corporate TLS inspection, every Python,
 Node and uv outbound call failed with `CERTIFICATE_VERIFY_FAILED` while `curl`
 worked — curl consults the macOS keychain, the others do not. Not something
 Nebius can fix, but it cost an hour and will hit anyone building from a managed

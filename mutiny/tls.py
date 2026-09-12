@@ -1,10 +1,10 @@
 """Make TLS work behind a corporate inspecting proxy, once, for everything.
 
-A TLS-inspecting middlebox terminates the
-connection and re-signs it with a CA that only the machine's own trust store
-knows about. curl works because macOS keychain has that CA; Python, Node, uv and
-requests do not consult the keychain, so they fail with
-``CERTIFICATE_VERIFY_FAILED`` on every outbound call.
+A TLS-inspecting middlebox terminates the connection and re-signs it with a
+certificate authority that only the machine's own trust store knows about. curl
+works because the macOS keychain has that CA; Python, Node, uv and requests do
+not consult the keychain, so they fail with ``CERTIFICATE_VERIFY_FAILED`` on
+every outbound call.
 
 The fix is one merged bundle — certifi's public roots plus whatever the admin
 installed locally — exported to a file and pointed at via the environment
