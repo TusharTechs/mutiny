@@ -147,13 +147,10 @@ class NemotronClient:
         context when it is constructed — repairing the environment does nothing
         for a connection pool that was already built.
         """
-        try:
-            return call()
-        except Exception as exc:  # noqa: BLE001 - re-raised unless we can repair
-            if not tls.repair(exc):
-                raise
+        def reset() -> None:
             self._client = None
-            return call()
+
+        return tls.with_repair(call, reset=reset)
 
     def _key(self, payload: dict[str, Any]) -> str:
         blob = json.dumps(payload, sort_keys=True, default=str).encode()

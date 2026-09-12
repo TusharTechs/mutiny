@@ -102,3 +102,44 @@ Two suggestions:
 We also could not find any way to disable reasoning for high-volume calls, which
 compounds this: `chat_template_kwargs={"thinking": False}` is silently ignored
 and `/no_think` lengthens the trace.
+
+## Sandboxes: the Token Factory key authenticates but cannot spawn
+
+A Token Factory API key is accepted by the Sandboxes endpoint — `whoami`
+succeeds and returns real limits — but every permission on it is false:
+
+```
+permissions: import False   spawn False   spawn_disposable False
+             list   False   cancel False  set_image_tag  False
+
+limits:      instance_max_timeout          3600
+             instance_max_concurrency        50
+             instance_max_layer_bytes      12 GiB
+             images_import_max_concurrency    8
+```
+
+Any actual operation then fails with `ForbiddenError: You do not have permission
+to perform this action`, and only when the lazily-built image chain is awaited —
+`images.use(...).run(...)` returns a `PREPARED` image with no error at all, so
+the failure surfaces some distance from its cause.
+
+Two suggestions, both cheap:
+
+1. Since `whoami` already reports the permission set, the SDK could refuse at
+   client construction with "this token has no Sandboxes permissions; enable
+   Sandboxes for the account" rather than deferring to a generic 403 later.
+2. Document the enablement path. Nothing we could find in the Sandboxes docs
+   says that a Token Factory key does not carry Sandboxes rights by default, or
+   how to obtain one that does. It reads as though the key you already have will
+   work.
+
+The confirmed `instance_max_concurrency: 50` does answer the concurrency
+question we had posted to the forum — it matches the documented Beta limit and
+it is per token, not per request.
+
+Separately, `get_token_info` reports our key expiring the same day it was
+issued, with the SDK printing "Token expires in 0 hours" on every client
+construction. Token Factory inference calls with the same key work normally, so
+either the expiry is specific to the Sandboxes view of the token or the warning
+is miscalculating. Either way the message appears on stdout rather than through
+`logging`, which is awkward for anything running non-interactively.

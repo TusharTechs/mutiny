@@ -205,3 +205,20 @@ def repair(exc: BaseException) -> bool:
         file=sys.stderr,
     )
     return True
+
+
+def with_repair(call, reset=None):
+    """Run `call`; on a certificate rejection, fix trust and try once more.
+
+    `reset` is invoked between attempts for clients that resolve their SSL
+    context at construction — httpx does, so repairing the environment does
+    nothing for a connection pool that already exists.
+    """
+    try:
+        return call()
+    except Exception as exc:  # noqa: BLE001 - re-raised unless repairable
+        if not repair(exc):
+            raise
+        if reset is not None:
+            reset()
+        return call()
