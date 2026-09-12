@@ -91,7 +91,12 @@ def focused_module(
     try:
         lo, hi = function_span(source, qualname)
     except ValueError:
-        return source
+        # Falling back to the whole file is what we are trying to avoid: an
+        # ambiguous bare name like __setitem__, which cachetools defines eight
+        # times, would silently restore the 800-line prompt.
+        raise ValueError(
+            f"cannot focus on {qualname!r} — qualify it as Class.method"
+        ) from None
 
     import ast as _ast
 

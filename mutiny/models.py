@@ -128,6 +128,7 @@ class NemotronClient:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.ledger = Ledger(ledger_path or root / ".cache" / "ledger.json").load()
         self.cap_usd = cap_usd
+        self.last_widened_to = 0
         self._client: Any = None
 
     # -- lazily construct so importing this module never needs a key
@@ -258,6 +259,7 @@ class NemotronClient:
             )
             if not call.truncated or text.strip():
                 return text, call
+            self.last_widened_to = budget
             budget *= 2
         assert call is not None
         return text, call

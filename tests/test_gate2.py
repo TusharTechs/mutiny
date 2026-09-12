@@ -371,3 +371,19 @@ def test_multiple_node_ids_run_together(repo):
     )
     assert run.verdict == PASSED
     assert len(run.outcomes) == 2
+
+
+def test_explaining_intended_behaviour_is_not_a_tell():
+    """The tell rule rejected a good test whose comment said "with the original
+    implementation the tag is built from major and minor only" — ordinary
+    technical prose, not a description of a diff."""
+    source = """
+from pricing import discount
+
+
+def test_discount_applies_at_threshold():
+    # The original implementation applies the discount once the subtotal
+    # reaches the threshold, so the boundary value is included.
+    assert discount(100.0) == 90.0
+"""
+    assert static_violations(source, BOUNDARY) == []

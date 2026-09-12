@@ -48,11 +48,13 @@ ADVERSARIAL_DUNDERS = {
     "__contains__", "__iter__", "__getitem__",
 }
 
-# A proof test should read as a test someone would have written anyway. Prose
-# about "the mutant" or "the original implementation" means it was written to
-# separate a diff, not to describe behaviour.
-MUTATION_TELLS = ("mutant", "mutated version", "original implementation",
-                  "mutated implementation", "the mutation")
+# A proof test should read as a test someone would have written anyway, so prose
+# about "the mutant" is a tell. Keep this narrow: "original implementation" was
+# in here and rejected a perfectly good test whose comment explained what the
+# function is supposed to do. Only phrases that can only mean "I am describing a
+# diff" belong here.
+MUTATION_TELLS = ("mutant", "mutated version", "mutated implementation",
+                  "the mutation", "before the mutation", "after the mutation")
 
 PROTOCOL_ASSERT_ATTRS = {
     "assert_called", "assert_called_once", "assert_called_with",

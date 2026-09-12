@@ -149,7 +149,8 @@ def generate_proof_test(
             attempts.append(ProofAttempt(
                 "", GateResult((RuleResult(
                     "0 model returned no content", "fail",
-                    f"truncated at {max_tokens} tokens with empty content and empty "
+                    f"truncated at {getattr(client, 'last_widened_to', 0) or max_tokens} "
+                    f"tokens with empty content and empty "
                     f"reasoning — the prompt is too large, not the allowance too small",
                 ),)), n, call.cost_usd, call.seconds, call.truncated))
             break

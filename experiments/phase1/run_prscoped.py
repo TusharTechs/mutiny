@@ -174,7 +174,7 @@ def main() -> int:
                       flush=True)
                 try:
                     attempts = generate_proof_test(
-                        client, repo, m, import_name, function.split(".")[-1],
+                        client, repo, m, import_name, function,
                         covering_tests=examples,
                         max_attempts=MAX_ATTEMPTS, python_exe=python_exe, repeats=1)
                 except BudgetExceeded as exc:
