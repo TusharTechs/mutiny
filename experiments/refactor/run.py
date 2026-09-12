@@ -28,7 +28,7 @@ from mutiny import refactor as R
 from mutiny.attacks import focused_module, function_span
 from mutiny.coverage import covering_examples, measure
 from mutiny.differential import compare, observe
-from mutiny.inputs import generate_validated, receiver_candidates
+from mutiny.inputs import generate_validated, is_stateful, receiver_candidates
 from mutiny.models import BudgetExceeded, NemotronClient
 from mutiny.runner import PASSED, SELECTION_ERROR, run_pytest
 
@@ -125,6 +125,7 @@ def run_case(client, repo, repo_name, path, module, qualname, python_exe, suite)
             probe=lambda e: observe(repo, module, e, python_exe),
             n=N_INPUTS, covering_tests=examples,
             subclasses=receiver_candidates(original, qualname),
+            stateful=is_stateful(original, qualname),
             diff=f"--- before\n+++ after\n{rf.original}\n=== rewritten ===\n{rf.rewritten}")
         c.inputs = len(exprs)
         if not exprs:

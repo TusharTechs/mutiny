@@ -63,8 +63,27 @@ USER = """Module `{module}`, the function under test is `{qualname}`:
 {source}
 ```
 
-{extra}{receivers}{change}Write {n} distinct snippets that reach `{qualname}`. If it is a
+{extra}{receivers}{stateful}{change}Write {n} distinct snippets that reach `{qualname}`. If it is a
 method, construct the receiver inline as part of the snippet."""
+
+STATEFUL = """`{owner}` accumulates state, so a single call reveals almost
+nothing about it. Write scenarios rather than calls. A scenario constructs the
+object with a definite capacity and sizing rule, drives it through several
+operations — including past its capacity — and then observes everything that
+matters at once:
+
+    c = LRUCache(maxsize=3, getsizeof=len); c["a"]="x"; c["b"]="yy"; c["b"]="zzzz"; (sorted(c.items()), c.currsize, len(c))
+
+Vary deliberately across your snippets: the capacity, the sizes of the values,
+whether a key is new or being replaced, whether the replacement is larger or
+smaller, the order of access before the operation, and how far past capacity the
+sequence goes. The boundary where something is evicted is where two versions
+differ.
+
+Always end with a tuple of the observable state — contents, size, length — never
+the object itself, whose repr hides exactly what changed.
+
+"""
 
 CHANGE = """This is the change under review:
 
@@ -126,6 +145,61 @@ def _valid(expr: str) -> bool:
     return True
 
 
+def _is_memo(attr: str) -> bool:
+    """Lazily filled caches are not accumulating state.
+
+    packaging's Version is immutable, but every comparison method writes
+    self._key_cache on first use. Counting that made an immutable value type look
+    like a container."""
+    lowered = attr.lower()
+    return lowered.endswith(("_cache", "_memo", "_cached")) or "cache" in lowered
+
+
+MUTATORS = {"__setitem__", "__delitem__", "__iadd__", "append", "add", "update",
+            "pop", "popitem", "clear", "insert", "remove", "extend", "push",
+            "expire", "evict", "put", "set"}
+
+
+def is_stateful(full_source: str, qualname: str) -> bool:
+    """Does this method belong to a type whose behaviour accumulates?
+
+    A single call cannot reveal it. cachetools' over-eviction only appears after
+    filling a cache past its capacity and then growing an existing entry, and
+    that gap has now hidden three separate changes from us.
+    """
+    if "." not in qualname:
+        return False
+    owner = qualname.rsplit(".", 2)[-2]
+    try:
+        tree = ast.parse(full_source)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.ClassDef) and node.name == owner):
+            continue
+        names = {c.name for c in node.body
+                 if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        if names & MUTATORS:
+            return True
+        # Or some method other than a constructor assigns to self. Assignment in
+        # __init__ is initialisation, not accumulation — counting it made every
+        # class with a constructor look stateful, semver's immutable Version
+        # included.
+        for method in node.body:
+            if not isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if method.name in {"__init__", "__new__", "__setstate__", "__post_init__"}:
+                continue
+            for child in ast.walk(method):
+                if (isinstance(child, ast.Attribute)
+                        and isinstance(child.ctx, ast.Store)
+                        and isinstance(child.value, ast.Name)
+                        and child.value.id == "self"
+                        and not _is_memo(child.attr)):
+                    return True
+    return False
+
+
 def receiver_candidates(full_source: str, qualname: str) -> list[str]:
     """Concrete subclasses that can stand in for the class owning `qualname`.
 
@@ -184,6 +258,7 @@ def generate(
     max_tokens: int = 14000,
     subclasses: list[str] | None = None,
     diff: str = "",
+    stateful: bool = False,
 ) -> list[str]:
     receivers = ""
     if subclasses:
@@ -195,6 +270,8 @@ def generate(
             {"role": "user", "content": USER.format(
                 module=module, qualname=qualname, source=source, n=n,
                 receivers=receivers,
+                stateful=(STATEFUL.format(owner=qualname.rsplit(".", 2)[-2])
+                          if stateful and "." in qualname else ""),
                 change=CHANGE.format(diff=diff[:4000]) if diff else "",
                 extra=(hint + "\n\n") if hint else "")},
         ],
@@ -243,6 +320,7 @@ def generate_validated(
     covering_tests: list[tuple[str, str]] | None = None,
     subclasses: list[str] | None = None,
     diff: str = "",
+    stateful: bool = False,
     model: str = SUPER,
 ):
     """Generate inputs, run them against the unmodified code, and re-ask if too
@@ -276,7 +354,8 @@ def generate_validated(
         produced: list[str] = []
         for _ in range(batches):
             produced += generate(client, module, qualname, source, n=batch, hint=hint,
-                                 model=model, subclasses=subclasses, diff=diff)
+                                 model=model, subclasses=subclasses, diff=diff,
+                                 stateful=stateful)
         exprs = [e for e in dict.fromkeys(produced) if e not in seen]
         if not exprs:
             if attempt == rounds:

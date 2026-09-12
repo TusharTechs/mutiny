@@ -30,7 +30,7 @@ from mutiny.attacks import focused_module
 from mutiny.coverage import covering_examples, measure
 from mutiny.differential import compare, observe
 from mutiny.diff import changed_lines, enclosing_functions, source_commits
-from mutiny.inputs import generate_validated, receiver_candidates
+from mutiny.inputs import generate_validated, is_stateful, receiver_candidates
 from mutiny.models import BudgetExceeded, NemotronClient
 
 ROOT = Path(__file__).resolve().parent
@@ -158,7 +158,8 @@ def one_run(client, repo, module, case, python_exe) -> dict:
         exprs, _ = generate_validated(
             client, module, fn, before_src,
             probe=lambda e: observe(repo, module, e, python_exe),
-            n=N_INPUTS, covering_tests=examples, subclasses=subclasses, diff=hunk)
+            n=N_INPUTS, covering_tests=examples, subclasses=subclasses, diff=hunk,
+            stateful=is_stateful(source_at(repo, f"{sha}^", path), fn))
         if not exprs:
             return {"inputs": 0, "usable": 0, "diverged": 0, "witnesses": [],
                     "error": "generator produced no parseable inputs"}
