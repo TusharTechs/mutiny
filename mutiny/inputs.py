@@ -237,6 +237,7 @@ def generate_validated(
     source: str,
     probe,
     n: int = 45,
+    batch: int = 15,
     rounds: int = 2,
     min_yield: float = 0.5,
     covering_tests: list[tuple[str, str]] | None = None,
@@ -266,12 +267,17 @@ def generate_validated(
     usable_obs: list = []
     seen: set[str] = set()
 
+    # Asked for 45 snippets in one reply the model sometimes runs out of room and
+    # returns nothing at all — a third of cases at one point. Several smaller
+    # requests cost the same in total and cannot fail whole.
+    batches = max(1, -(-n // max(1, batch)))
+
     for attempt in range(1, rounds + 1):
-        exprs = [
-            e for e in generate(client, module, qualname, source, n=n, hint=hint,
-                                model=model, subclasses=subclasses, diff=diff)
-            if e not in seen
-        ]
+        produced: list[str] = []
+        for _ in range(batches):
+            produced += generate(client, module, qualname, source, n=batch, hint=hint,
+                                 model=model, subclasses=subclasses, diff=diff)
+        exprs = [e for e in dict.fromkeys(produced) if e not in seen]
         if not exprs:
             if attempt == rounds:
                 break
