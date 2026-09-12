@@ -21,3 +21,7 @@ packages = ["mutiny"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# tests/fixtures holds sample repositories that MUTINY operates on. They are
+# data, not our test suite: collecting them would run someone else's tests and
+# break the moment a mutation is applied mid-run.
+norecursedirs = ["tests/fixtures", ".venv", "experiments/*/checkouts"]

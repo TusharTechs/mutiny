@@ -52,3 +52,14 @@ project is architected the way it is. The billing model for sandbox compute —
 whether it draws on Token Factory credits or a separate meter — is the one thing
 not answered anywhere I could find, and it is load-bearing for anyone deciding
 how much to fan out.
+
+## Environment (not a Nebius issue, recorded for completeness)
+
+Building from a corporate laptop behind corporate TLS inspection, every Python,
+Node and uv outbound call failed with `CERTIFICATE_VERIFY_FAILED` while `curl`
+worked — curl consults the macOS keychain, the others do not. Not something
+Nebius can fix, but it cost an hour and will hit anyone building from a managed
+device. A one-line note in the quickstart ("behind a TLS-inspecting proxy, point
+`SSL_CERT_FILE` at a bundle that includes your organisation's CA") would save
+that hour. MUTINY now merges certifi with the system keychain automatically —
+see `mutiny/tls.py`.

@@ -54,19 +54,17 @@ def tavily_api_key(required: bool = False) -> str | None:
 
 
 def ca_bundle() -> str | None:
-    """Corporate TLS inspection re-signs every connection, so the
-    default trust store fails. certs/ca-bundle.pem merges certifi with the local
-    proxy roots; regenerate it with scripts/build-ca-bundle.sh."""
-    bundle = Path(__file__).resolve().parent.parent / "certs" / "ca-bundle.pem"
-    return str(bundle) if bundle.is_file() else None
+    """Path to the merged CA bundle. See mutiny.tls for why this exists."""
+    from .tls import BUNDLE
+
+    return str(BUNDLE) if BUNDLE.is_file() else None
 
 
 def apply_tls_trust() -> None:
-    """Point every HTTP library at the merged bundle. Idempotent."""
-    bundle = ca_bundle()
-    if bundle:
-        for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
-            os.environ[var] = bundle
+    """Deprecated alias — mutiny.tls.apply() runs automatically on import."""
+    from .tls import apply
+
+    apply()
 
 
 def have_nebius() -> bool:
