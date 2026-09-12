@@ -3,6 +3,13 @@
 This is the model's whole job in the differential design, and it is a much
 easier job than writing a proof test.
 
+The change under review is shown to the generator. Withholding it makes for a
+purer experiment — detection is then genuinely blind — but it is the wrong
+product. When the job is to verify a change someone just made, the change is
+precisely what the inputs should target, and a generator shown only the working
+code has no reason to produce the malformed inputs that a validation fix is
+about. Four commits were missed exactly that way.
+
 Super is the generator, which is not the obvious choice. Measured on the same
 prompt asking for 45 snippets: Nano spends 26,000 characters reasoning before it
 writes anything and frequently exhausts its allowance first, producing nothing;
@@ -56,8 +63,21 @@ USER = """Module `{module}`, the function under test is `{qualname}`:
 {source}
 ```
 
-{extra}{receivers}Write {n} distinct snippets that reach `{qualname}`. If it is a
+{extra}{receivers}{change}Write {n} distinct snippets that reach `{qualname}`. If it is a
 method, construct the receiver inline as part of the snippet."""
+
+CHANGE = """This is the change under review:
+
+```diff
+{diff}
+```
+
+Concentrate on inputs that reach the lines it touches and would show their
+effect. If the change concerns validation or error handling, that means
+malformed and out-of-range inputs, not only well-formed ones — the interesting
+behaviour is on the path being changed. Do not assume the change is correct.
+
+"""
 
 RECEIVERS = """`{owner}` may be a base class whose behaviour is only observable
 through a concrete subclass. These are available in this module, and you should
@@ -163,6 +183,7 @@ def generate(
     model: str = SUPER,
     max_tokens: int = 14000,
     subclasses: list[str] | None = None,
+    diff: str = "",
 ) -> list[str]:
     receivers = ""
     if subclasses:
@@ -174,6 +195,7 @@ def generate(
             {"role": "user", "content": USER.format(
                 module=module, qualname=qualname, source=source, n=n,
                 receivers=receivers,
+                change=CHANGE.format(diff=diff[:4000]) if diff else "",
                 extra=(hint + "\n\n") if hint else "")},
         ],
         model=model, max_tokens=max_tokens, temperature=0.7,
@@ -219,6 +241,7 @@ def generate_validated(
     min_yield: float = 0.5,
     covering_tests: list[tuple[str, str]] | None = None,
     subclasses: list[str] | None = None,
+    diff: str = "",
     model: str = SUPER,
 ):
     """Generate inputs, run them against the unmodified code, and re-ask if too

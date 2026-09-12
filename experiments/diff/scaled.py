@@ -152,10 +152,13 @@ def one_run(client, repo, module, case, python_exe) -> dict:
                 examples = covering_examples(repo, cov, path, ln, limit=2)
                 if examples:
                     break
+        hunk = subprocess.run(
+            ["git", "diff", "--unified=6", f"{sha}^..{sha}", "--", path],
+            cwd=repo, capture_output=True, text=True).stdout
         exprs, _ = generate_validated(
             client, module, fn, before_src,
             probe=lambda e: observe(repo, module, e, python_exe),
-            n=N_INPUTS, covering_tests=examples, subclasses=subclasses)
+            n=N_INPUTS, covering_tests=examples, subclasses=subclasses, diff=hunk)
         if not exprs:
             return {"inputs": 0, "usable": 0, "diverged": 0, "witnesses": [],
                     "error": "generator produced no parseable inputs"}
