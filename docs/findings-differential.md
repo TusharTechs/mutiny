@@ -144,9 +144,9 @@ Twenty-one functions across semver, cachetools and packaging.
 |---|---|
 | refactors produced | 18/21 |
 | broken — tests rejected them | **3/18 = 17%** |
-| of the known-broken, differential also caught | **1/3 = 33%** |
-| of the 13 tests accepted, behaviour changed | **0/13** |
-| cost | $0.08 for the set |
+| of the known-broken, differential also caught | **2/3 = 67%** |
+| of the 14 tests accepted, behaviour changed | **0/14** |
+| cost | $0.07 for the set |
 
 ## Three things this establishes
 
@@ -162,6 +162,29 @@ number this project can defend.
 **Detection is partial and the gap has a shape.** One of three. Both misses were
 `Cache.__setitem__` and `LRUCache.popitem` — stateful methods whose behaviour
 only emerges from a sequence of operations under capacity pressure.
+
+## A blind spot I wrote myself
+
+The `Cache.__setitem__` refactor went undetected for a while, and the reason is
+worth keeping. The harness finds it immediately given one input:
+
+```python
+c = Cache(maxsize=2); c["a"] = 1; sorted(c.items())
+  before: [('a', 1)]
+  after:  AttributeError: '_DefaultSize' object has no attribute 'get'
+```
+
+The rewrite calls `self.__size.get(...)`, and when no `getsizeof` is supplied
+cachetools uses a sentinel object rather than a dict. The break exists only on
+the default path — and the scenario prompt written to fix the *previous* miss
+told the model to construct "with a definite capacity and sizing rule". Every
+snippet duly passed a sizing function, took the non-default path, and behaved
+identically on both versions.
+
+Instructing the generator more precisely made it blinder. Both prompts now ask
+for optional arguments to be omitted about half the time, on the principle that
+a default is a separate code path and usually the most used and least tested
+one. Detection on known-broken refactors went from 33% to 67%.
 
 ## The weakness is the same one, three times over
 
