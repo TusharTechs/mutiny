@@ -98,6 +98,7 @@ for expr in exprs:
     try:
         value = run(expr, dict(base))
         rec["ok"] = True
+        rec["type"] = type(value).__name__
         try:
             rec["value"], rec["opaque"] = describe(value)
         except Exception as exc:
@@ -105,7 +106,9 @@ for expr in exprs:
             rec["opaque"] = True
     except Exception as exc:
         rec["ok"] = False
+        rec["type"] = type(exc).__name__
         rec["error"] = f"{type(exc).__name__}: {exc}"[:400]
+        rec["message"] = _ADDRESS.sub("", " ".join(str(exc).split()))[:300]
     except BaseException as exc:
         rec["ok"] = False
         rec["error"] = f"{type(exc).__name__} (fatal)"
@@ -122,18 +125,32 @@ class Observation:
     value: str | None = None
     error: str | None = None
     opaque: bool = False
+    type: str | None = None
+    message: str | None = None
 
     @property
     def outcome(self) -> str:
-        """What a caller actually sees — a value, or a kind of failure.
+        """What a caller actually sees.
 
-        Exception *messages* are deliberately excluded: they change with
-        refactoring far more often than behaviour does, and treating a reworded
-        error as a divergence would bury the real ones.
+        The type is part of it: a function whose return type changed has changed
+        behaviour even when the two reprs happen to read alike.
+
+        Exception messages are included too. They were excluded at first on the
+        theory that rewording is noise — but four of ten missed commits were
+        *about* error behaviour ("reject invalid tags", "normalize invalid
+        specifier errors", "aggregate validation errors"), so discarding the
+        message made those undetectable by construction. Message-only
+        differences are reported as their own, weaker class rather than
+        suppressed; see `kind`.
         """
         if self.ok:
-            return f"value:{self.value}"
-        return f"raised:{(self.error or '').split(':', 1)[0]}"
+            return f"value:{self.type}:{self.value}"
+        return f"raised:{self.type}:{self.message}"
+
+    @property
+    def coarse(self) -> str:
+        """Outcome ignoring an exception's wording — what changed structurally."""
+        return f"value:{self.type}:{self.value}" if self.ok else f"raised:{self.type}"
 
 
 @dataclass(frozen=True)
@@ -142,10 +159,18 @@ class Divergence:
     before: Observation
     after: Observation
 
+    @property
+    def kind(self) -> str:
+        """`behaviour` when the value or failure changed; `message` when only an
+        error's wording did. Both are real, but they are not equally strong."""
+        return "behaviour" if self.before.coarse != self.after.coarse else "message"
+
     def __str__(self) -> str:
         def side(o: Observation) -> str:
             return o.value if o.ok else f"raises {o.error}"
-        return f"{self.input}\n    before: {side(self.before)}\n    after:  {side(self.after)}"
+        tag = "" if self.kind == "behaviour" else "  [message only]"
+        return (f"{self.input}{tag}\n    before: {side(self.before)}"
+                f"\n    after:  {side(self.after)}")
 
 
 def observe(
@@ -178,7 +203,7 @@ def observe(
         raw = json.loads(out.read_text())
     observations = [
         Observation(r["input"], r["ok"], r.get("value"), r.get("error"),
-                    r.get("opaque", False))
+                    r.get("opaque", False), r.get("type"), r.get("message"))
         for r in raw
     ]
 

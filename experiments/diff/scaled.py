@@ -166,8 +166,10 @@ def one_run(client, repo, module, case, python_exe) -> dict:
     divs = compare(before, after)
     idx = {o.input: o for o in after}
     usable = sum(1 for b in before if b.ok and idx.get(b.input) and idx[b.input].ok)
+    strong = [d for d in divs if d.kind == "behaviour"]
     return {"inputs": len(exprs), "usable": usable, "diverged": len(divs),
-            "witnesses": [str(d) for d in divs[:2]]}
+            "behaviour": len(strong), "message_only": len(divs) - len(strong),
+            "witnesses": [str(d) for d in (strong or divs)[:2]]}
 
 
 def main() -> int:
@@ -207,8 +209,10 @@ def main() -> int:
             note = f"  [{res['error']}]" if res.get("error") else ""
             if not note and res["inputs"] and not res["usable"]:
                 note = "  [inputs generated but none ran — investigate]"
+            extra = (f" ({res.get('message_only')} message-only)"
+                     if res.get("message_only") else "")
             print(f"  run {r+1}: {res['usable']}/{res['inputs']} usable, "
-                  f"{res['diverged']} divergent{note}", flush=True)
+                  f"{res['diverged']} divergent{extra}{note}", flush=True)
             for w in res["witnesses"][:1]:
                 print("    " + w.replace("\n", "\n  "), flush=True)
         records.append({**case, "repo": repo_name, "runs": runs})
@@ -234,6 +238,10 @@ def main() -> int:
     if fixes:
         print(f"  behaviour changes detected:   {sum(fixes)}/{len(fixes)} "
               f"= {100*sum(fixes)/len(fixes):.0f}%")
+        strong = sum(1 for rec in records if rec["expect"]
+                     and any(r.get("behaviour", 0) > 0 for r in rec["runs"]))
+        print(f"    of those, on value or failure: {strong}"
+              f"   (rest are error-wording changes)")
     if refactors:
         flagged = sum(refactors)
         print(f"  preserving commits flagged:   {flagged}/{len(refactors)}"
