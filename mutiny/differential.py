@@ -23,8 +23,10 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-DRIVER = '''
-import ast, importlib, json, re, sys
+DRIVER = r'''
+import ast, importlib, json, os, re, sys
+
+sys.path.insert(0, os.getcwd())
 
 # repr() falls back to the object's memory address, which differs on every
 # process. Left alone it makes any object without a custom __repr__ diverge by
@@ -34,9 +36,37 @@ _ADDRESS = re.compile(r"(?: at | @ )(?:0x[0-9a-fA-F]+|\d{6,})")
 _OPAQUE = re.compile(r"^<[\w.]+ object>$")
 
 
+def canonical(value, depth=0):
+    """A repr that does not vary with things the caller cannot observe.
+
+    Sets and dicts have no defined iteration order, so their repr reorders
+    between processes and makes identical values look different -- two apparent
+    detections were frozensets holding exactly the same tags. Membership is the
+    behaviour; ordering is not.
+    """
+    if depth > 6:
+        return "..."
+    if isinstance(value, (set, frozenset)):
+        inner = sorted(canonical(v, depth + 1) for v in value)
+        return ("frozenset({" if isinstance(value, frozenset) else "{") + \
+               ", ".join(inner) + ("})" if isinstance(value, frozenset) else "}")
+    if isinstance(value, dict):
+        items = sorted((canonical(k, depth + 1), canonical(v, depth + 1))
+                       for k, v in value.items())
+        return "{" + ", ".join(f"{k}: {v}" for k, v in items) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(canonical(v, depth + 1) for v in value) + "]"
+    if isinstance(value, tuple):
+        inner = ", ".join(canonical(v, depth + 1) for v in value)
+        return f"({inner},)" if len(value) == 1 else f"({inner})"
+    return _ADDRESS.sub("", repr(value))
+
+
 def describe(value):
-    text = repr(value)[:600]
-    text = _ADDRESS.sub("", text)
+    try:
+        text = canonical(value)[:600]
+    except Exception:
+        text = _ADDRESS.sub("", repr(value)[:600])
     return text, bool(_OPAQUE.match(text.strip()))
 
 module_name, out_path = sys.argv[1], sys.argv[2]
@@ -134,6 +164,9 @@ def observe(
         out = tmpd / "out.json"
         env = dict(os.environ)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
+        # Fixed so string hashing, and therefore set iteration, is stable across
+        # the two runs being compared.
+        env["PYTHONHASHSEED"] = "0"
         proc = subprocess.run(
             [python_exe, str(tmpd / "driver.py"), module, str(out), str(tmpd / "exprs.json")],
             cwd=repo, env=env, capture_output=True, text=True, timeout=timeout,
