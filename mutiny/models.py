@@ -143,7 +143,7 @@ class NemotronClient:
         blob = json.dumps(payload, sort_keys=True, default=str).encode()
         return hashlib.sha256(blob).hexdigest()[:32]
 
-    def complete(
+    def _complete_once(
         self,
         messages: list[dict[str, str]],
         model: str = SUPER,
@@ -210,4 +210,39 @@ class NemotronClient:
         call = Call(model, pt, ct, cost, round(elapsed, 2), False, tag,
                     finish_reason, len(reasoning))
         self.ledger.add(call)
+        return text, call
+
+    def complete(
+        self,
+        messages: list[dict[str, Any]],
+        model: str = SUPER,
+        max_tokens: int = 1200,
+        temperature: float = 0.2,
+        response_format: dict[str, Any] | None = None,
+        tag: str = "",
+        allow_network: bool = True,
+        auto_widen: int = 3,
+    ) -> tuple[str, Call]:
+        """Complete, widening the allowance if reasoning consumed all of it.
+
+        Nemotron reasons before answering and the trace bills against max_tokens,
+        so an allowance that looks generous can be spent entirely on thinking --
+        returning empty content, finish_reason "length", and no error at all.
+        Observed in practice: Nano emitted 23,000 characters of reasoning and no
+        answer, four times out of seven. Retrying with a wider allowance is the
+        only remedy, and doing it here means no caller can forget it.
+        """
+        budget = max_tokens
+        text, call = "", None
+        for widening in range(max(1, auto_widen)):
+            text, call = self._complete_once(
+                messages, model=model, max_tokens=budget, temperature=temperature,
+                response_format=response_format,
+                tag=f"{tag}@{budget}" if widening else tag,
+                allow_network=allow_network,
+            )
+            if not call.truncated or text.strip():
+                return text, call
+            budget *= 2
+        assert call is not None
         return text, call

@@ -14,6 +14,41 @@ import ast
 PREFIX = "_mut_"
 
 
+def find_function(
+    tree: ast.AST, qualname: str
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    """Resolve "name" or "Class.method". Method names repeat across classes in
+    real code -- cachetools defines popitem six times -- so a bare name is only
+    usable when it is unique."""
+    *owner, name = qualname.split(".")
+
+    def scope(node: ast.AST) -> list[ast.AST]:
+        return list(ast.iter_child_nodes(node))
+
+    nodes: list[ast.AST] = [tree]
+    for cls in owner:
+        found = [
+            n for parent in nodes for n in scope(parent)
+            if isinstance(n, ast.ClassDef) and n.name == cls
+        ]
+        if not found:
+            return None
+        nodes = found
+
+    matches = [
+        n for parent in nodes for n in ast.walk(parent)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name
+    ]
+    if owner:
+        matches = [
+            n for parent in nodes for n in scope(parent)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name
+        ] or matches
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
 class _LocalCollector(ast.NodeVisitor):
     """Names bound inside the function body that are safe to rename."""
 
@@ -82,11 +117,7 @@ def rename_locals(source: str, func_name: str) -> str | None:
     except SyntaxError:
         return None
 
-    target: ast.FunctionDef | ast.AsyncFunctionDef | None = None
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func_name:
-            target = node
-            break
+    target = find_function(tree, func_name)
     if target is None:
         return None
 

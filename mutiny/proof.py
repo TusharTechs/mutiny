@@ -114,19 +114,11 @@ def generate_proof_test(
 
     attempts: list[ProofAttempt] = []
     for n in range(1, max_attempts + 1):
-        # Nemotron reasons before it answers, and the trace is billed against the
-        # same allowance. A truncated reply is a budgeting mistake on our side,
-        # not a failed attempt, so widen and retry without spending one.
-        budget = max_tokens
-        for _ in range(3):
-            text, call = client.complete(
-                messages, model=model, max_tokens=budget,
-                temperature=0.3 if n > 1 else 0.0,
-                tag=f"proof:{mutation.id or mutation.path}:{n}:{budget}",
-            )
-            if not (call.truncated and not extract_code(text).strip()):
-                break
-            budget *= 2
+        text, call = client.complete(
+            messages, model=model, max_tokens=max_tokens,
+            temperature=0.3 if n > 1 else 0.0,
+            tag=f"proof:{mutation.id or mutation.path}:{n}",
+        )
         source = extract_code(text)
         gate = verify(
             repo, mutation, source, proof_test_path,
