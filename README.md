@@ -1,44 +1,218 @@
 # MUTINY
 
-Adversarial verification for AI-written code.
+**Did that refactor actually preserve behaviour?**
 
-MUTINY attacks the diff in a pull request, runs those attacks in isolated forked
-sandboxes, and reports a blind spot **only when it can produce a test that passes
-on HEAD and fails on the mutant**.
-
-> Coverage tells you which lines ran. MUTINY tells you which bugs your tests would miss.
-
-Status: pre-alpha. Phase 1 (proof-test gate validation) in progress.
-
-## The loop
+An agent rewrites your function. The tests pass. MUTINY runs both versions on
+hundreds of generated inputs and shows you the exact input where they disagree —
+or tells you there isn't one.
 
 ```
-ATTACK  ->  SURVIVE  ->  PROVE  ->  REPAIR
+c = Cache(maxsize=2); c["a"] = 1; sorted(c.items())
+    before: [('a', 1)]
+    after:  AttributeError: '_DefaultSize' object has no attribute 'get'
 ```
 
-Two gates decide what a developer ever sees:
+That is a real refactor, produced by Nemotron 3 Super, of `cachetools.Cache.__setitem__`.
+It reads as a tidy-up. It breaks the library for every caller who does not pass
+an explicit `getsizeof`.
 
-- **Gate 1 — plausibility.** A mutant must import cleanly, survive the repo's own
-  linter and type-checker, and change observable behaviour. Otherwise it is a
-  broken build, not a blind spot.
-- **Gate 2 — proof.** A surviving mutant is reported only if MUTINY can write a
-  test that passes on HEAD and fails on the mutant *by assertion*, touches only
-  the public interface, and is invariant to a semantics-preserving rename.
+## Why this exists
 
-Equivalent mutants can never satisfy Gate 2, so they are dropped by the same
-mechanism that produces the evidence. Precision is 100% by construction.
+Published work finds **19–35% of LLM-generated refactorings are functionally
+incorrect, and over 21% of those errors pass the project's existing tests**. We
+reproduced the first half independently: of 18 refactors Nemotron produced for
+real functions in `semver`, `cachetools` and `packaging`, **17% were rejected by
+the repositories' own test suites**.
+
+Teams are now merging agent-written changes at a rate no review process was
+designed for, and the test suite is the only gate. When the change is subtle —
+an edge case, a default argument, an eviction order — the suite is not enough.
+
+## How it works
+
+The model's only job is to produce **inputs**. Execution produces the evidence.
+
+```
+  function under review
+          │
+          ├── Nemotron generates call expressions and stateful scenarios
+          │   (informed by the diff, by tests that already cover the line,
+          │    and by the concrete subclasses that can stand in as receivers)
+          │
+          ├── run every input against the ORIGINAL
+          ├── run every input against the REWRITE
+          │
+          └── compare outcomes ─── divergence? here is the input that proves it
+```
+
+That division of labour is the whole design, and it is why this works where our
+first attempt did not. **A wrong assertion manufactures a false finding. A wrong
+input is rejected identically by both versions and simply contributes nothing.**
+Bad inputs are wasted, never wrong — so the model only has to be *productive*,
+not *correct*.
+
+An earlier version of this project asked Nemotron to write a test proving a
+specific bug. It managed that 13% of the time at 120B and 13% at 550B. Inverting
+the burden moved the same task to 62–67%.
+
+## Results
+
+Measured on real code, not fixtures. Every number is reproducible from
+`experiments/`.
+
+**Agent refactor safety** — Nemotron refactors a function, the repository's own
+tests judge it, and the differential runs regardless:
+
+| | |
+|---|---|
+| refactors produced | 18 / 21 functions |
+| functionally broken (tests rejected them) | **17%** |
+| of those, differential also caught | **67%** |
+| of the 14 tests accepted, behaviour changed | **0** |
+| cost | ~$0.01 per function |
+
+**Detection on real bug-fix commits** — 24 commits across three libraries, each
+run twice, ground truth taken from commit messages:
+
+| | |
+|---|---|
+| behaviour changes detected | **62%** |
+| behaviour-preserving commits falsely flagged | **0** |
+| runs agreeing across repeats | 94% |
+
+The zero is the number worth defending. Across 14 correct refactors and 5
+behaviour-preserving commits, MUTINY has never raised a false alarm.
+
+Getting there meant finding three separate ways a comparison can lie: memory
+addresses in the default `repr`, which differ every process; set and dict
+iteration order, which made identical collections look different; and hash-seed
+randomisation, which changes the behaviour of anything whose logic touches dict
+ordering. Each produced confident, specific, entirely false findings before it
+was fixed. A verification tool that cries wolf gets switched off in a week.
+
+## How NVIDIA Nemotron is used
+
+Nemotron does two jobs, both load-bearing:
+
+1. **It writes the code under review.** `mutiny/refactor.py` asks
+   `nemotron-3-super-120b-a12b` to refactor a real function for readability while
+   preserving behaviour. This is the change MUTINY then verifies.
+2. **It generates the probes.** `mutiny/inputs.py` asks it for call expressions
+   and stateful scenarios that reach the changed lines, steered by the diff, by
+   the tests that already cover those lines, and by the concrete subclasses
+   available as receivers.
+
+### Choosing a model is about task shape, not parameter count
+
+We measured all four on an identical prompt asking for 45 call expressions:
+
+| model | usable inputs | completion tokens | reasoning emitted | time |
+|---|---:|---:|---:|---:|
+| Nemotron 3 Nano 30B-A3B | 44 | 9,846 | 26,300 chars | 33.9 s |
+| Nemotron 3.5 Lightning | 1 | 14,000 | 0 | 56.0 s |
+| **Nemotron 3 Super 120B-A12B** | **42** | **4,520** | **0** | **10.7 s** |
+| Nemotron 3 Ultra 550B-A55B | — | — | — | — |
+
+Super emits *no reasoning at all* on this task and answers directly, in a third
+of Nano's time for half the tokens. Nano deliberates for 26,000 characters about
+how to write call expressions and frequently exhausts its allowance before
+writing one.
+
+The reverse held for the harder task. On writing a test that mechanically proves
+a specific bug, Ultra scored **identically to Super — 2/15 each**, and Super
+failed *worse* than the smaller models when starved of tokens. Bigger was not
+better; the shape of the work decided the model.
+
+## Where Token Factory accelerated the work
+
+- **One OpenAI-compatible endpoint for four models.** Swapping Nano for Super
+  for Ultra is a string change, which is what made the comparison table above
+  cheap enough to actually run rather than assume.
+- **`mutiny/models.py`** wraps it with a spend cap, a persistent token ledger and
+  content-hash response caching. Re-running an experiment costs nothing, which
+  turned a 2.5-hour benchmark into a 20-minute one and made iterating on the
+  measurement affordable. Total spend across every experiment in this repository
+  is under $3.
+- **Reasoning-aware retry.** Nemotron 3 bills its reasoning trace against
+  `max_tokens`, so a generous-looking allowance can be spent entirely on
+  thinking. The client detects that and widens, except for one signature where
+  widening provably never helps (see `docs/feedback.md`).
+
+## Nebius Sandboxes
+
+`mutiny/sandbox.py` implements the executor against the ConTree SDK, behind the
+same interface as the local one.
+
+The fit is unusually good: `image.run()` returns a *new* image rather than
+mutating the old one, so running N probes against one warm image is **N forks
+from a single checkpoint, isolated by construction**. That is exactly this
+workload's shape — one expensive setup (clone, install, warm the interpreter),
+then hundreds of short independent executions that must not see each other's
+state. Locally we pay setup once and then serialise; on Sandboxes the batches run
+concurrently, up to the documented ceiling of 50.
+
+**Status: unverified.** A Token Factory key authenticates against the Sandboxes
+endpoint and `whoami` returns real limits, but every permission on it is false,
+and operations fail with `ForbiddenError`. Beta access has been requested. The
+module is marked unverified in its own docstring and will stay that way until it
+has actually run.
 
 ## Setup
 
 ```bash
 uv venv --python 3.12 .venv
 uv pip install -e ".[dev]" --python .venv/bin/python
-cp .env.example .env      # add NEBIUS_API_KEY
+cp .env.example .env          # add NEBIUS_API_KEY and NEBIUS_PROJECT_ID
 .venv/bin/python scripts/doctor.py
 ```
 
-`doctor.py` checks connectivity, credentials and model availability, and prints
-spend to date. Run it first if anything starts failing.
+`doctor.py` verifies connectivity, credentials, model availability and spend.
+Run it first whenever anything fails.
+
+### Reproducing the results
+
+The benchmarks clone three real repositories and run against their history:
+
+```bash
+.venv/bin/python experiments/refactor/run.py     # agent refactor safety
+.venv/bin/python experiments/diff/scaled.py 8    # detection on real fix commits
+.venv/bin/python -m pytest tests/ -q             # 52 tests
+```
+
+## Architecture
+
+| module | responsibility |
+|---|---|
+| `mutiny/refactor.py` | Nemotron rewrites a function; the rewrite is applied in place |
+| `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |
+| `mutiny/differential.py` | runs both versions, canonicalises observations, compares |
+| `mutiny/coverage.py` | which tests execute which line — steers probes and test selection |
+| `mutiny/diff.py` | changed lines, source-vs-test filtering, enclosing functions |
+| `mutiny/models.py` | Token Factory client: spend cap, ledger, caching, retry |
+| `mutiny/sandbox.py` | the same execution, forked from a warm Sandboxes checkpoint |
+| `mutiny/tls.py` | reactive certificate-trust repair for inspecting proxies |
+
+An observation records the value's **type**, a canonicalised `repr`, and for
+failures the exception type and normalised message. Memory addresses are
+stripped, unordered containers are sorted, and the hash seed is pinned — because
+an observation that varies for reasons the caller cannot control is not
+evidence. Each of those was added after it produced a confident, specific,
+entirely false finding.
+
+## What it does not do
+
+- **Side effects are invisible.** A function that mutates its argument or writes
+  a file and returns `None` gives nothing to compare.
+- **Exception chaining is not observed.** One known miss is a refactor that
+  changed `__context__` while preserving the raised type and message.
+- **Pinning the hash seed hides seed-dependent behaviour.** Necessary to compare
+  two runs at all, and a real trade-off: it cost us a finding we had to retract.
+- **Unreachable code stays unreached.** A branch requiring a particular OS, a
+  network condition or a race has no call expression that gets to it.
+
+`docs/findings-differential.md` records the measurements and the retraction in
+full, including a finding we reported internally as the headline result and then
+withdrew when a pinned hash seed showed it was an artifact of our own harness.
 
 ## Licence
 
