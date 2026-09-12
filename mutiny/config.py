@@ -45,6 +45,19 @@ def nebius_base_url() -> str:
     return os.environ.get("NEBIUS_BASE_URL") or DEFAULT_BASE_URL
 
 
+def nebius_project_id(required: bool = False) -> str | None:
+    """Sandboxes routes by project as well as by token; inference does not."""
+    load_env()
+    pid = os.environ.get("NEBIUS_PROJECT_ID") or None
+    if required and not pid:
+        raise RuntimeError(
+            "NEBIUS_PROJECT_ID is not set. Find it on the Sandboxes page in the "
+            "Token Factory console and add it to .env:\n"
+            "    NEBIUS_PROJECT_ID=aiproject-...\n"
+        )
+    return pid
+
+
 def tavily_api_key(required: bool = False) -> str | None:
     load_env()
     key = os.environ.get("TAVILY_API_KEY") or None

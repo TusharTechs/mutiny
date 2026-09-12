@@ -123,15 +123,21 @@ to perform this action`, and only when the lazily-built image chain is awaited �
 `images.use(...).run(...)` returns a `PREPARED` image with no error at all, so
 the failure surfaces some distance from its cause.
 
-Two suggestions, both cheap:
+The enablement path turns out to be a **Request beta access** button on the
+Sandboxes page in the Token Factory console, which resolves it. Two suggestions
+remain, both cheap:
 
 1. Since `whoami` already reports the permission set, the SDK could refuse at
    client construction with "this token has no Sandboxes permissions; enable
    Sandboxes for the account" rather than deferring to a generic 403 later.
-2. Document the enablement path. Nothing we could find in the Sandboxes docs
-   says that a Token Factory key does not carry Sandboxes rights by default, or
-   how to obtain one that does. It reads as though the key you already have will
-   work.
+2. Say in the docs that a Token Factory key does not carry Sandboxes rights
+   until Beta access is granted, and link the request button. The SDK quickstart
+   reads as though the key you already have will work, and the console page that
+   carries the button is a different surface from the documentation.
+
+3. `NEBIUS_PROJECT_ID` is required alongside the key, and appears only in the
+   console quickstart — not in the docs we were working from. A missing project
+   id produces no distinct error either.
 
 The confirmed `instance_max_concurrency: 50` does answer the concurrency
 question we had posted to the forum — it matches the documented Beta limit and

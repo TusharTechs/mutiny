@@ -18,11 +18,12 @@ forks are concurrent, and the documented ceiling is 50 at a time (confirmed:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import tls
-from .config import nebius_api_key
+from .config import nebius_api_key, nebius_project_id
 from .differential import DRIVER, Observation
 
 
@@ -42,7 +43,13 @@ class SandboxExecutor:
             from contree_sdk import ContreeSync
 
             tls.apply()
-            self._client = ContreeSync(token=nebius_api_key())
+            # The SDK reads NEBIUS_API_KEY and NEBIUS_PROJECT_ID from the
+            # environment; Sandboxes routes by project, unlike inference.
+            os.environ.setdefault("NEBIUS_API_KEY", nebius_api_key())
+            pid = nebius_project_id()
+            if pid:
+                os.environ.setdefault("NEBIUS_PROJECT_ID", pid)
+            self._client = ContreeSync()
         return self._client
 
     def _call(self, fn):
@@ -92,11 +99,15 @@ def available() -> tuple[bool, str]:
     try:
         from contree_sdk import ContreeSync
 
-        who = tls.with_repair(
-            lambda: ContreeSync(token=nebius_api_key()).get_token_info())
+        os.environ.setdefault("NEBIUS_API_KEY", nebius_api_key())
+        pid = nebius_project_id()
+        if pid:
+            os.environ.setdefault("NEBIUS_PROJECT_ID", pid)
+        who = tls.with_repair(lambda: ContreeSync().get_token_info())
     except Exception as exc:  # noqa: BLE001
         return False, f"{type(exc).__name__}: {exc}"[:200]
     missing = [k for k in ("spawn", "import") if not who.permissions.get(k)]
     if missing:
-        return False, f"token lacks Sandboxes permissions: {', '.join(missing)}"
+        return False, (f"token lacks Sandboxes permissions ({', '.join(missing)}) — "
+                       "request Beta access on the Sandboxes page in the console")
     return True, f"concurrency limit {who.limits.get('instance_max_concurrency')}"
