@@ -283,7 +283,12 @@ def verify(
     )
 
     # Rule 5 — invariant to a semantics-preserving rename of the target's locals.
-    if target_function is None:
+    # Only meaningful for a test that passes on HEAD: one that does not would fail
+    # the renamed run too, and reporting that as a second, separate defect
+    # overstates how many distinct things went wrong.
+    if not head_ok:
+        rules.append(RuleResult("5 rename-invariant", SKIP, "test does not pass on HEAD"))
+    elif target_function is None:
         rules.append(RuleResult("5 rename-invariant", SKIP, "no target function supplied"))
     else:
         original = (root / mutation.path).read_text(encoding="utf-8")

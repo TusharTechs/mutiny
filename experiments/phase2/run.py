@@ -11,6 +11,7 @@ Usage:  run.py [commits-per-repo] [--repos a,b]
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -25,7 +26,7 @@ from mutiny import gate1
 from mutiny.attacks import function_span, generate_mutations
 from mutiny.coverage import covering_examples, measure
 from mutiny.diff import changed_lines, enclosing_functions, source_commits
-from mutiny.models import BudgetExceeded, NemotronClient
+from mutiny.models import LIGHTNING, NANO, SUPER, ULTRA, BudgetExceeded, NemotronClient
 from mutiny.proof import generate_proof_test
 from mutiny.runner import PASSED, SELECTION_ERROR, run_pytest
 
@@ -37,6 +38,8 @@ REPOS = {
     "cachetools": "cachetools",
     "packaging": "packaging",
 }
+PROOF_MODEL = {"nano": NANO, "lightning": LIGHTNING, "super": SUPER,
+               "ultra": ULTRA}[os.environ.get("MUTINY_PROOF_MODEL", "super").lower()]
 N_MUTATIONS = 6
 MAX_ATTEMPTS = 3
 MIN_LINES, MAX_LINES = 2, 60
@@ -176,7 +179,8 @@ def run_target(client, repo_name, repo, sha, subject, changed, fn, out) -> Targe
             examples = covering_examples(repo, cov, m.path, m.line, limit=3)
             attempts = generate_proof_test(
                 client, repo, m, package, fn, covering_tests=examples,
-                max_attempts=MAX_ATTEMPTS, python_exe=python_exe, repeats=1)
+                model=PROOF_MODEL, max_attempts=MAX_ATTEMPTS,
+                python_exe=python_exe, repeats=1)
             final = attempts[-1]
             record = {"line": m.line, "bug_class": m.bug_class,
                       "mutation": f"{m.original.strip()} -> {m.mutated.strip()}",
@@ -252,7 +256,8 @@ def main() -> int:
         found = discover(repo, per_repo)
         print(f"{repo_name}: {len(found)} usable commits", flush=True)
         plan += [(repo_name, repo, *f) for f in found]
-    print(f"\n{len(plan)} targets total\n", flush=True)
+    print(f"\n{len(plan)} targets total   proof model: "
+          f"{PROOF_MODEL.split('/')[-1]}\n", flush=True)
 
     for repo_name, repo, sha, subject, changed, fn in plan:
         try:
