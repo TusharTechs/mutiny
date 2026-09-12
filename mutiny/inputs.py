@@ -269,7 +269,7 @@ def generate_validated(
     for attempt in range(1, rounds + 1):
         exprs = [
             e for e in generate(client, module, qualname, source, n=n, hint=hint,
-                                model=model, subclasses=subclasses)
+                                model=model, subclasses=subclasses, diff=diff)
             if e not in seen
         ]
         if not exprs:

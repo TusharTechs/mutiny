@@ -103,13 +103,25 @@ commit messages:
 
 | | |
 |---|---|
-| behaviour changes detected | **4/14 = 29%** |
-| preserving commits flagged | **0/5** |
-| runs agreeing across repeats | **19/19 = 100%** |
-| cases yielding no inputs | 5/24 (excluded — they measure nothing) |
+| behaviour changes detected | **8/13 = 62%** |
+| preserving commits flagged | **0/3** |
+| runs agreeing across repeats | **15/16 = 94%** |
+| cases yielding no inputs | 8/24 (excluded — they measure nothing) |
 | cost | ~$0.01 per commit |
 
-29% is the honest figure, after removing artifacts that had inflated it to 43%.
+62%, up from 29%, entirely from showing the generator the change under review.
+The four commits that recovered were all validation or error-path fixes, which a
+generator shown only the working source has no reason to probe:
+
+```
+next_version("prerelease") on 1.0.0-beta.2   '1.0.0-beta.3' -> '1.0.0-rc.1'
+bump_build("")                               'build.1'      -> '1'
+_process_summary("\r")                       returned "\r"   -> raises InvalidMetadata
+parse_tag("3py-none-any")                    accepted       -> raises InvalidTag
+```
+
+Zero false positives has held through every revision, which is the property that
+decides whether anyone leaves the tool switched on.
 Zero false positives is the number worth defending: across five genuinely
 behaviour-preserving commits, the harness stayed silent every time.
 

@@ -1,0 +1,658 @@
+[
+  {
+    "sha": "fdec4ae1e5e296e890a5da0fb582b54f1af0da34",
+    "subject": "fix(next_version): reset prerelease when token changes (#339) ",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 39,
+        "usable": 39,
+        "diverged": 9,
+        "behaviour": 9,
+        "message_only": 0,
+        "witnesses": [
+          "str(Version.parse(\"1.0.0-beta.2\").next_version(\"prerelease\"))\n    before: '1.0.0-beta.3'\n    after:  '1.0.0-rc.1'",
+          "str(Version.parse(\"1.0.0-beta\").next_version(\"prerelease\"))\n    before: '1.0.0-beta.0'\n    after:  '1.0.0-rc.1'"
+        ]
+      },
+      {
+        "inputs": 39,
+        "usable": 39,
+        "diverged": 9,
+        "behaviour": 9,
+        "message_only": 0,
+        "witnesses": [
+          "str(Version.parse(\"1.0.0-beta.2\").next_version(\"prerelease\"))\n    before: '1.0.0-beta.3'\n    after:  '1.0.0-rc.1'",
+          "str(Version.parse(\"1.0.0-beta\").next_version(\"prerelease\"))\n    before: '1.0.0-beta.0'\n    after:  '1.0.0-rc.1'"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "a8bb4f89fc010b367d0925dc4da72c883d2d15d3",
+    "subject": "fix: replace deprecated semver.parse() with semver.Version.par",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'semver.version' \u2014 the symbols are probably defined in a submodule. First: 'se"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'semver.version' \u2014 the symbols are probably defined in a submodule. First: 'se"
+      }
+    ]
+  },
+  {
+    "sha": "d8813b67a2ec5d579365f51a6d8f96d02f3fcbc3",
+    "subject": "Fix #460 Improve bump_prerelease to alway get a newer version ",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 45,
+        "usable": 45,
+        "diverged": 3,
+        "behaviour": 3,
+        "message_only": 0,
+        "witnesses": [
+          "v = Version(1,2,3,'rc',None).next_version('prerelease'); (v.major, v.minor, v.patch, v.prerelease, v.build)\n    before: (1, 2, 3, 'rc', None)\n    after:  (1, 2, 3, 'rc.0', None)",
+          "v = Version(1,2,3,'rc',None).next_version('prerelease',''); (v.major, v.minor, v.patch, v.prerelease, v.build)\n    before: (1, 2, 3, 'rc', None)\n    after:  (1, 2, 3, 'rc.0', None)"
+        ]
+      },
+      {
+        "inputs": 45,
+        "usable": 45,
+        "diverged": 3,
+        "behaviour": 3,
+        "message_only": 0,
+        "witnesses": [
+          "v = Version(1,2,3,'rc',None).next_version('prerelease'); (v.major, v.minor, v.patch, v.prerelease, v.build)\n    before: (1, 2, 3, 'rc', None)\n    after:  (1, 2, 3, 'rc.0', None)",
+          "v = Version(1,2,3,'rc',None).next_version('prerelease',''); (v.major, v.minor, v.patch, v.prerelease, v.build)\n    before: (1, 2, 3, 'rc', None)\n    after:  (1, 2, 3, 'rc.0', None)"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "4b03f867a3deaecb07240f471fed9bf9c9072629",
+    "subject": "Fix #426: call subclass when deriving from Version",
+    "path": "src/semver/version.py",
+    "fn": "Version.replace",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 28,
+        "usable": 28,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 28,
+        "usable": 28,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "47b49cac131c24b1d3f9046ecb62fdace0c2de9e",
+    "subject": "Fix #258: Keep semver._deprecated.compare",
+    "path": "src/semver/_deprecated.py",
+    "fn": "compare",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 32,
+        "usable": 32,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 32,
+        "usable": 32,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "f8a182f5ec52ba29c60059d40a91e749d0f56df9",
+    "subject": "Fix #344 Allow empty string for bump methods",
+    "path": "src/semver/version.py",
+    "fn": "Version.bump_build",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 47,
+        "usable": 47,
+        "diverged": 9,
+        "behaviour": 9,
+        "message_only": 0,
+        "witnesses": [
+          "Version(1,2,3,None,None).bump_build(\"\").build\n    before: 'build.1'\n    after:  '1'",
+          "Version(1,2,3,None,None).bump_build(0).build\n    before: 'build.1'\n    after:  '0.1'"
+        ]
+      },
+      {
+        "inputs": 47,
+        "usable": 47,
+        "diverged": 9,
+        "behaviour": 9,
+        "message_only": 0,
+        "witnesses": [
+          "Version(1,2,3,None,None).bump_build(\"\").build\n    before: 'build.1'\n    after:  '1'",
+          "Version(1,2,3,None,None).bump_build(0).build\n    before: 'build.1'\n    after:  '0.1'"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "6176316e49c5279118178330d050548eefe71927",
+    "subject": "Fix return type of classmethod parse (#396)",
+    "path": "src/semver/version.py",
+    "fn": "Version.parse",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "61335e0953dc4dbae2884aee5e96d45ac009f80f",
+    "subject": "General cleanup, reformat files",
+    "path": "src/semver/version.py",
+    "fn": "Version.parse",
+    "expect": false,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "39b31bc9b63abe98497409945e9d382d8918c8fb",
+    "subject": "Fix #405: Fix Cache.__setitem__ over-evicting when growing an ",
+    "path": "src/cachetools/__init__.py",
+    "fn": "Cache.__setitem__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "13bb86a55e36e501cf0b3e4c35db516ed9409fd7",
+    "subject": "Minor style improvements to keep ruff happy.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "Cache.__init__",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 40,
+        "usable": 40,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 40,
+        "usable": 40,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "c0fdf6abab38040947d6fe2e38c507401d5e2350",
+    "subject": "Fix TLRUCache silently keeping stale value on expired overwrit",
+    "path": "src/cachetools/__init__.py",
+    "fn": "TLRUCache.__setitem__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "98ec79ff8be24ce1346d6a96602f11ccbda4f76f",
+    "subject": "Drop \"class method\" from @cachedmethod docstring.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "cachedmethod",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "57d2e4813d9801f97034559e22428bac6f7c6c9b",
+    "subject": "Fix #387: Handle obj=None case for inspection in _DescriptorBa",
+    "path": "src/cachetools/_cachedmethod.py",
+    "fn": "_DescriptorBase.__get__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "d3128001693d46f1a352fb940db18539cac34f99",
+    "subject": "Minor code readability improvements.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "TLRUCache.expire",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "cc0cf2299ec3c659b66e611a08926518b851a8b5",
+    "subject": "Minor style and readability improvements.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "LFUCache.__setitem__",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 41,
+        "usable": 41,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 41,
+        "usable": 41,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "4d74eb46f507d231faa20f96c4285d36d38e021b",
+    "subject": "Fix #356: Improve RRCache performance.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "RRCache.popitem",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 29,
+        "usable": 29,
+        "diverged": 7,
+        "behaviour": 7,
+        "message_only": 0,
+        "witnesses": [
+          "c=RRCache(2); c['a']=1; c['b']=2; c['c']=3; c.popitem()\n    before: ('a', 1)\n    after:  ('b', 2)",
+          "c=RRCache(10); c['a']=1; c['b']=2; c['a']=3; p=c.popitem(); (frozenset(c.keys()), p)\n    before: (frozenset({'b'}), ('a', 3))\n    after:  (frozenset({'a'}), ('b', 2))"
+        ]
+      },
+      {
+        "inputs": 29,
+        "usable": 29,
+        "diverged": 6,
+        "behaviour": 6,
+        "message_only": 0,
+        "witnesses": [
+          "c=RRCache(2); c['a']=1; c['b']=2; c.popitem()\n    before: ('a', 1)\n    after:  ('b', 2)",
+          "c=RRCache(2); c['a']=1; c['b']=2; c['c']=3; c.popitem()\n    before: ('b', 2)\n    after:  ('a', 1)"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "4e79787a31c99348649bb0dafee2a5078d3595be",
+    "subject": "fix(tags): preserve explicitly empty platform iterables (#1360",
+    "path": "src/packaging/tags.py",
+    "fn": "compatible_tags",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 45,
+        "usable": 41,
+        "diverged": 23,
+        "behaviour": 23,
+        "message_only": 0,
+        "witnesses": [
+          "list(compatible_tags(python_version=(3,8), interpreter=None, platforms=[]))\n    before: [<py38-none-macosx_26_0_arm64>, <py38-none-macosx_26_0_universal2>, <py38-none-macosx_25_0_arm64>, <py38-none-macosx_25_0_universal2>, <py38-none-macosx_24_0_arm64>, <py38-none-macosx_24_0_universal2>, <py38-none-macosx_23_0_arm64>, <py38-none-macosx_23_0_universal2>, <py38-none-macosx_22_0_arm64>, <py38-none-macosx_22_0_universal2>, <py38-none-macosx_21_0_arm64>, <py38-none-macosx_21_0_universal2>, <py38-none-macosx_20_0_arm64>, <py38-none-macosx_20_0_universal2>, <py38-none-macosx_19_0_arm64>, <py38-none-macosx_19_0_universal2>, <py38-none-macosx_18_0_arm64>, <py38-none-macosx_18_0_universal\n    after:  [<py38-none-any>, <py3-none-any>, <py37-none-any>, <py36-none-any>, <py35-none-any>, <py34-none-any>, <py33-none-any>, <py32-none-any>, <py31-none-any>, <py30-none-any>]",
+          "list(compatible_tags(python_version=(3,8), interpreter=\"cp38\", platforms=[]))\n    before: [<py38-none-macosx_26_0_arm64>, <py38-none-macosx_26_0_universal2>, <py38-none-macosx_25_0_arm64>, <py38-none-macosx_25_0_universal2>, <py38-none-macosx_24_0_arm64>, <py38-none-macosx_24_0_universal2>, <py38-none-macosx_23_0_arm64>, <py38-none-macosx_23_0_universal2>, <py38-none-macosx_22_0_arm64>, <py38-none-macosx_22_0_universal2>, <py38-none-macosx_21_0_arm64>, <py38-none-macosx_21_0_universal2>, <py38-none-macosx_20_0_arm64>, <py38-none-macosx_20_0_universal2>, <py38-none-macosx_19_0_arm64>, <py38-none-macosx_19_0_universal2>, <py38-none-macosx_18_0_arm64>, <py38-none-macosx_18_0_universal\n    after:  [<cp38-none-any>, <py38-none-any>, <py3-none-any>, <py37-none-any>, <py36-none-any>, <py35-none-any>, <py34-none-any>, <py33-none-any>, <py32-none-any>, <py31-none-any>, <py30-none-any>]"
+        ]
+      },
+      {
+        "inputs": 45,
+        "usable": 41,
+        "diverged": 23,
+        "behaviour": 23,
+        "message_only": 0,
+        "witnesses": [
+          "list(compatible_tags(python_version=(3,8), interpreter=None, platforms=[]))\n    before: [<py38-none-macosx_26_0_arm64>, <py38-none-macosx_26_0_universal2>, <py38-none-macosx_25_0_arm64>, <py38-none-macosx_25_0_universal2>, <py38-none-macosx_24_0_arm64>, <py38-none-macosx_24_0_universal2>, <py38-none-macosx_23_0_arm64>, <py38-none-macosx_23_0_universal2>, <py38-none-macosx_22_0_arm64>, <py38-none-macosx_22_0_universal2>, <py38-none-macosx_21_0_arm64>, <py38-none-macosx_21_0_universal2>, <py38-none-macosx_20_0_arm64>, <py38-none-macosx_20_0_universal2>, <py38-none-macosx_19_0_arm64>, <py38-none-macosx_19_0_universal2>, <py38-none-macosx_18_0_arm64>, <py38-none-macosx_18_0_universal\n    after:  [<py38-none-any>, <py3-none-any>, <py37-none-any>, <py36-none-any>, <py35-none-any>, <py34-none-any>, <py33-none-any>, <py32-none-any>, <py31-none-any>, <py30-none-any>]",
+          "list(compatible_tags(python_version=(3,8), interpreter=\"cp38\", platforms=[]))\n    before: [<py38-none-macosx_26_0_arm64>, <py38-none-macosx_26_0_universal2>, <py38-none-macosx_25_0_arm64>, <py38-none-macosx_25_0_universal2>, <py38-none-macosx_24_0_arm64>, <py38-none-macosx_24_0_universal2>, <py38-none-macosx_23_0_arm64>, <py38-none-macosx_23_0_universal2>, <py38-none-macosx_22_0_arm64>, <py38-none-macosx_22_0_universal2>, <py38-none-macosx_21_0_arm64>, <py38-none-macosx_21_0_universal2>, <py38-none-macosx_20_0_arm64>, <py38-none-macosx_20_0_universal2>, <py38-none-macosx_19_0_arm64>, <py38-none-macosx_19_0_universal2>, <py38-none-macosx_18_0_arm64>, <py38-none-macosx_18_0_universal\n    after:  [<cp38-none-any>, <py38-none-any>, <py3-none-any>, <py37-none-any>, <py36-none-any>, <py35-none-any>, <py34-none-any>, <py33-none-any>, <py32-none-any>, <py31-none-any>, <py30-none-any>]"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "2d873eb6002021a8c007c933fbdab58b37a5079b",
+    "subject": "fix(metadata): fold every line boundary when writing headers (",
+    "path": "src/packaging/metadata.py",
+    "fn": "_Validator._process_summary",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 32,
+        "usable": 11,
+        "diverged": 21,
+        "behaviour": 21,
+        "message_only": 0,
+        "witnesses": [
+          "v=_Validator();v.raw_name='TestField';v._process_summary('\\r')\n    before: '\\r'\n    after:  raises InvalidMetadata: 'TestField' must be a single line",
+          "v=_Validator();v.raw_name='TestField';v._process_summary('a\\rb')\n    before: 'a\\rb'\n    after:  raises InvalidMetadata: 'TestField' must be a single line"
+        ]
+      },
+      {
+        "inputs": 32,
+        "usable": 11,
+        "diverged": 21,
+        "behaviour": 21,
+        "message_only": 0,
+        "witnesses": [
+          "v=_Validator();v.raw_name='TestField';v._process_summary('\\r')\n    before: '\\r'\n    after:  raises InvalidMetadata: 'TestField' must be a single line",
+          "v=_Validator();v.raw_name='TestField';v._process_summary('a\\rb')\n    before: 'a\\rb'\n    after:  raises InvalidMetadata: 'TestField' must be a single line"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "26fa1d42ccd98010d5fcf701dd10069e761b034c",
+    "subject": "fix: reject invalid interpreter tags (#1351)",
+    "path": "src/packaging/tags.py",
+    "fn": "parse_tag",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 20,
+        "usable": 14,
+        "diverged": 6,
+        "behaviour": 6,
+        "message_only": 0,
+        "witnesses": [
+          "parse_tag(\"3py-none-any\")\n    before: frozenset({<3py-none-any>})\n    after:  raises InvalidTag: Tag '3py-none-any' has an invalid interpreter: '3py'",
+          "parse_tag(\"py 3-none-any\")\n    before: frozenset({<py 3-none-any>})\n    after:  raises InvalidTag: Tag 'py 3-none-any' has an invalid interpreter: 'py 3'"
+        ]
+      },
+      {
+        "inputs": 20,
+        "usable": 14,
+        "diverged": 6,
+        "behaviour": 6,
+        "message_only": 0,
+        "witnesses": [
+          "parse_tag(\"3py-none-any\")\n    before: frozenset({<3py-none-any>})\n    after:  raises InvalidTag: Tag '3py-none-any' has an invalid interpreter: '3py'",
+          "parse_tag(\"py 3-none-any\")\n    before: frozenset({<py 3-none-any>})\n    after:  raises InvalidTag: Tag 'py 3-none-any' has an invalid interpreter: 'py 3'"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "826426fc88773515fab149a5f6bde85761e57fbb",
+    "subject": "fix(pylock): respect an explicitly empty tag sequence in selec",
+    "path": "src/packaging/pylock.py",
+    "fn": "Pylock.select",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "fe18f139c5b3d73cd9fdd9b25f1eda1b6fd7ba15",
+    "subject": "fix(requirements): normalize invalid specifier errors (#1332)",
+    "path": "src/packaging/requirements.py",
+    "fn": "Requirement.__init__",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 24,
+        "usable": 24,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 24,
+        "usable": 24,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "206834025040aca6f8a2fdfc4039dbfa2a9861a6",
+    "subject": "fix(metadata): aggregate from_email validation errors (#1268)",
+    "path": "src/packaging/metadata.py",
+    "fn": "Metadata.from_email",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 21,
+        "usable": 21,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 21,
+        "usable": 21,
+        "diverged": 0,
+        "behaviour": 0,
+        "message_only": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "5b583e309996a085ad3b5b045f3bf50a09c11b58",
+    "subject": "fix: preserve marker quote semantics when serializing values (",
+    "path": "src/packaging/_parser.py",
+    "fn": "Value.serialize",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 45,
+        "usable": 37,
+        "diverged": 16,
+        "behaviour": 16,
+        "message_only": 0,
+        "witnesses": [
+          "Value(\"a\\\"b\").serialize()\n    before: '\"a\"b\"'\n    after:  '\\'a\"b\\''",
+          "Value(\"a\\\"'b\").serialize()\n    before: '\"a\"\\'b\"'\n    after:  raises ValueError: Cannot serialize marker value containing both quote characters"
+        ]
+      },
+      {
+        "inputs": 45,
+        "usable": 37,
+        "diverged": 16,
+        "behaviour": 16,
+        "message_only": 0,
+        "witnesses": [
+          "Value(\"a\\\"b\").serialize()\n    before: '\"a\"b\"'\n    after:  '\\'a\"b\\''",
+          "Value(\"a\\\"'b\").serialize()\n    before: '\"a\"\\'b\"'\n    after:  raises ValueError: Cannot serialize marker value containing both quote characters"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "9d0ec47b36a1bcdf705b397b84cd89272410a00d",
+    "subject": "fix(metadata): reject malformed Description-Content-Type value",
+    "path": "src/packaging/metadata.py",
+    "fn": "_Validator._process_description_content_type",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'packaging.metadata' \u2014 the symbols are probably defined in a submodule. First:"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'packaging.metadata' \u2014 the symbols are probably defined in a submodule. First:"
+      }
+    ]
+  }
+]
