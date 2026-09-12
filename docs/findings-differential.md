@@ -11,26 +11,47 @@ distinction is structural rather than a matter of degree — a wrong assertion
 manufactures a false finding, while a wrong input is rejected identically by both
 versions and contributes nothing. **Bad inputs are wasted, never wrong.**
 
-## A real behaviour change, found in the wild
+## A retracted finding, and why it matters
 
-`cachetools` commit `cc0cf229`, by the library's maintainer, titled
-**"Minor style and readability improvements."**
+This document previously reported that `cachetools` commit `cc0cf229` — titled
+"Minor style and readability improvements" — silently changed which entry
+`LFUCache` evicts. **That was wrong.** The commit is exactly what it claims.
 
-```python
-c = LFUCache(2); c["a"] = 1; c["b"] = 2; c["c"] = 3; (len(c), sorted(c.items()))
-  before: (2, [('b', 2), ('c', 3)])   # evicted 'a'
-  after:  (2, [('a', 1), ('c', 3)])   # evicted 'b'
-```
+The apparent divergence was two processes running with different random hash
+seeds. LFU tie-breaking depends on dict iteration order, which depends on string
+hashing, which Python randomises per process unless `PYTHONHASHSEED` is set.
+Pinning it settles the question:
 
-The diff rewrote `return self.__touch(key)` as `self.__touch(key); return`, and
-replaced a `try/except KeyError` with an `if/else`. Both read as cosmetic. They
-changed which entry LFUCache evicts when usage counts tie.
+| PYTHONHASHSEED | before | after | |
+|---|---|---|---|
+| 0 | `(2, [('b',2), ('c',3)])` | `(2, [('b',2), ('c',3)])` | same |
+| 1 | `(2, [('b',2), ('c',3)])` | `(2, [('b',2), ('c',3)])` | same |
+| 12345 | `(2, [('a',1), ('c',3)])` | `(2, [('a',1), ('c',3)])` | same |
 
-Whether the maintainer considers the tie-breaking order part of the contract is
-a fair question. What is not in question is that behaviour changed under a commit
-message asserting it had not, and that a one-line reproduction exists. That is
-the case the project is built for, and it was found without any knowledge of the
-commit beyond its pre-change source.
+The output varies with the seed and not with the commit.
+
+It is worth being blunt about how close this came to being published. It was
+reported internally as the project's headline result — a maintainer shipping a
+silent behaviour change under a cosmetic message. Putting that in a submission,
+or worse in an upstream issue, would have been a public and unretractable
+accusation about someone's work, based on a bug in our harness.
+
+Three classes of artifact have now been found and fixed, all of which produced
+confident, specific, entirely false findings:
+
+- **memory addresses** in the default `repr`, which differ every process, so any
+  object without a custom `__repr__` diverged by construction;
+- **set and dict iteration order**, which made `frozenset({a, b})` and
+  `frozenset({b, a})` look like different values;
+- **hash seed randomisation**, which changes the behaviour of anything whose
+  logic depends on dict ordering.
+
+The through-line: a differential harness compares *observations*, and an
+observation that varies for reasons the caller cannot control is not evidence.
+Every source of nondeterminism has to be pinned or normalised before a
+divergence means anything. The three found so far are unlikely to be the last,
+so the standard for any future finding is that it survives a pinned seed and a
+canonicalised comparison, and reproduces by hand.
 
 ## Model selection is decided by task shape, not size
 
@@ -77,7 +98,22 @@ detection rate from a real number to 16%.
 
 ## Status
 
-Stability across repeated runs is 92%, up from swings that made five-case
-comparisons unreadable. Cost is roughly $0.01 per commit examined. Detection rate
-awaits a re-run with the module fix, since ten of nineteen behaviour-changing
-cases could not produce a single input.
+Measured across 24 real commits, each run twice, with ground truth taken from
+commit messages:
+
+| | |
+|---|---|
+| behaviour changes detected | **4/14 = 29%** |
+| preserving commits flagged | **0/5** |
+| runs agreeing across repeats | **19/19 = 100%** |
+| cases yielding no inputs | 5/24 (excluded — they measure nothing) |
+| cost | ~$0.01 per commit |
+
+29% is the honest figure, after removing artifacts that had inflated it to 43%.
+Zero false positives is the number worth defending: across five genuinely
+behaviour-preserving commits, the harness stayed silent every time.
+
+The confirmed detections are real and specific — semver's `bump_prerelease`
+producing `'.0'` where it produced `''`, cachetools' `RRCache.popitem` returning
+a different entry, and packaging's marker serialisation turning `'"""'` into
+`'\'"\''`.
