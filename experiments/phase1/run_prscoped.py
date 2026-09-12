@@ -24,10 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from mutiny import gate1
 from mutiny.attacks import function_span, generate_mutations
+from mutiny.coverage import covering_examples, measure
 from mutiny.diff import changed_lines, enclosing_functions
 from mutiny.models import BudgetExceeded, NemotronClient
 from mutiny.proof import generate_proof_test
-from mutiny.runner import PASSED, run_pytest
+from mutiny.runner import PASSED, SELECTION_ERROR, run_pytest
 
 ROOT = Path(__file__).resolve().parent
 CHECKOUTS = ROOT / "checkouts"
@@ -79,7 +80,11 @@ class Result:
     proven: int = 0
     attempts: list[int] = field(default_factory=list)
     seconds: float = 0.0
+    coverage_seconds: float = 0.0
+    uncovered_rejected: int = 0
+    selection_fallbacks: int = 0
     blind_spots: list[dict] = field(default_factory=list)
+    unproven: list[dict] = field(default_factory=list)
 
 
 def main() -> int:
@@ -113,6 +118,16 @@ def main() -> int:
             in_fn = tuple(n for n in target.lines if lo <= n <= hi) or target.lines
             print(f"  {target.path}  {function}  ({len(in_fn)} changed lines)", flush=True)
 
+            # One instrumented run of the suite, before any mutation. It answers two
+            # questions at once: whether a line is covered at all (Gate 1), and
+            # which tests reach it (the proof-test prompt, and the selector below).
+            cov_t0 = time.monotonic()
+            cov = measure(repo, selector, import_name.split(".")[0], python_exe)
+            res.coverage_seconds = round(time.monotonic() - cov_t0, 1)
+            print(f"  coverage: {len(cov.by_line)} lines mapped in "
+                  f"{res.coverage_seconds}s" + ("" if cov.measured else f" — {cov.note}"),
+                  flush=True)
+
             try:
                 muts, rejected = generate_mutations(
                     client, repo, target.path, function, n=N_MUTATIONS, only_lines=in_fn)
@@ -124,13 +139,26 @@ def main() -> int:
 
             survivors = []
             for m in muts:
-                p = gate1.check(m, repo, python_exe)
+                p = gate1.check(m, repo, python_exe, coverage=cov)
                 if not p.ok:
                     res.gate1_rejected += 1
+                    if "uncovered code" in p.reason:
+                        res.uncovered_rejected += 1
                     print(f"  [gate1] {m.bug_class:22s} {p.reason[:52]}", flush=True)
                     continue
+                # A test that never executes the mutated line cannot be affected by
+                # it, so running the whole suite per mutant is wasted work. This is
+                # where the 800-second packaging runs went.
+                covering = cov.tests_for(m.path, m.line, limit=200)
+                mutant_selector = list(covering) if covering else [selector]
                 with m.applied(repo):
-                    run = run_pytest(repo, selector, python_exe, timeout=900)
+                    run = run_pytest(repo, mutant_selector, python_exe, timeout=900)
+                    if run.verdict == SELECTION_ERROR:
+                        # A node id coverage gave us no longer resolves — usually a
+                        # parametrise id that does not round-trip. Fall back rather
+                        # than score the mutant on a run that never happened.
+                        res.selection_fallbacks += 1
+                        run = run_pytest(repo, selector, python_exe, timeout=900)
                 if run.verdict == PASSED:
                     survivors.append(m)
                     print(f"  [SURVIVED] L{m.line} {m.bug_class:20s} "
@@ -140,13 +168,15 @@ def main() -> int:
             res.survivors = len(survivors)
             print(f"  -> {res.killed} killed, {res.survivors} survived", flush=True)
 
-            test_files = sorted((repo / "tests").rglob("test_*.py"), key=lambda p: -p.stat().st_size)
-            test_rel = str(test_files[0].relative_to(repo)) if test_files else "tests/"
             for m in survivors:
+                examples = covering_examples(repo, cov, m.path, m.line, limit=3)
+                print(f"     showing {len(examples)} covering test(s) as worked examples",
+                      flush=True)
                 try:
                     attempts = generate_proof_test(
                         client, repo, m, import_name, function.split(".")[-1],
-                        test_rel, max_attempts=MAX_ATTEMPTS, python_exe=python_exe, repeats=1)
+                        covering_tests=examples,
+                        max_attempts=MAX_ATTEMPTS, python_exe=python_exe, repeats=1)
                 except BudgetExceeded as exc:
                     print(f"  budget: {exc}"); break
                 final = attempts[-1]
@@ -160,6 +190,14 @@ def main() -> int:
                     print(f"  [PROVEN in {final.attempt}] L{m.line} {m.bug_class}", flush=True)
                 else:
                     rules = ",".join(r.name.split()[0] for r in final.gate.failures)
+                    res.unproven.append({
+                        "line": m.line, "bug_class": m.bug_class,
+                        "mutation": f"{m.original.strip()} -> {m.mutated.strip()}",
+                        "blocked_on": rules, "attempts": len(attempts),
+                        "covering_tests": list(cov.tests_for(m.path, m.line)),
+                        "last_test": final.source,
+                        "gate": [f"{r.name}: {r.detail}" for r in final.gate.failures],
+                    })
                     print(f"  [unproven/{len(attempts)}] L{m.line} {m.bug_class} "
                           f"— blocked on rule {rules}", flush=True)
 

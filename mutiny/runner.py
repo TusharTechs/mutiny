@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,11 @@ FAILED_ASSERTION = "failed_assertion"
 ERRORED = "errored"
 SKIPPED = "skipped"
 NO_TESTS = "no_tests"
+# pytest exits 4 on a usage error (an unresolvable node id) and 5 when nothing
+# was collected. Neither means the mutant was caught — it means we asked for the
+# wrong tests, and treating it as a kill would silently lose real survivors.
+SELECTION_ERROR = "selection_error"
+_SELECTION_EXITS = {4, 5}
 
 
 @dataclass(frozen=True)
@@ -46,7 +52,7 @@ class PytestRun:
         if self.timed_out:
             return ERRORED
         if not self.outcomes:
-            return NO_TESTS
+            return SELECTION_ERROR if self.exit_status in _SELECTION_EXITS else NO_TESTS
         statuses = {o.status for o in self.outcomes}
         for dominant in (ERRORED, FAILED_ASSERTION, SKIPPED):
             if dominant in statuses:
@@ -72,12 +78,20 @@ def _classify(status: str, exc_type: str | None) -> str:
 
 def run_pytest(
     root: Path,
-    selector: str,
+    selector: str | Sequence[str],
     python_exe: str = sys.executable,
     timeout: int = 300,
     extra_args: tuple[str, ...] = (),
 ) -> PytestRun:
-    """Run `selector` under pytest in `root` and return classified outcomes."""
+    """Run `selector` under pytest in `root` and return classified outcomes.
+
+    `selector` may be one path or node id, or a sequence of them — coverage
+    tells us exactly which tests execute a mutated line, and running only those
+    is both sound and far cheaper than the whole suite.
+    """
+    selectors = [selector] if isinstance(selector, str) else list(selector)
+    if not selectors:
+        raise ValueError("run_pytest needs at least one selector")
     with tempfile.TemporaryDirectory(prefix="mutiny-probe-") as tmp:
         plugin_dir = Path(tmp)
         (plugin_dir / "mutiny_probe.py").write_text(PLUGIN_SOURCE, encoding="utf-8")
@@ -91,7 +105,7 @@ def run_pytest(
         env["PYTHONDONTWRITEBYTECODE"] = "1"
 
         cmd = [
-            python_exe, "-m", "pytest", selector,
+            python_exe, "-m", "pytest", *selectors,
             "-p", "mutiny_probe",
             "-p", "no:cacheprovider",
             "-q", "--tb=no", "--no-header",

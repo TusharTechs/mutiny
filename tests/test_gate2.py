@@ -348,3 +348,26 @@ def test_rename_locals_returns_none_when_nothing_to_do():
     src = (FIXTURE / "pricing.py").read_text()
     assert rename_locals(src, "clamp") is None
     assert rename_locals(src, "does_not_exist") is None
+
+
+# ---------------------------------------------------- selector robustness
+
+def test_unresolvable_node_id_is_not_mistaken_for_a_kill(repo):
+    """Coverage can hand us a node id that no longer resolves. pytest exits 4 and
+    collects nothing — which must not read as 'the tests caught the mutant'."""
+    from mutiny.runner import SELECTION_ERROR
+
+    run = run_pytest(repo, ["tests/test_pricing.py::test_does_not_exist"], sys.executable)
+    assert run.verdict == SELECTION_ERROR
+    assert run.verdict != PASSED
+
+
+def test_multiple_node_ids_run_together(repo):
+    run = run_pytest(
+        repo,
+        ["tests/test_pricing.py::test_small_order_gets_no_discount",
+         "tests/test_pricing.py::test_clamp_floors_negatives"],
+        sys.executable,
+    )
+    assert run.verdict == PASSED
+    assert len(run.outcomes) == 2

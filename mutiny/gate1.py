@@ -13,8 +13,12 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .mutant import Mutation, MutationError
+
+if TYPE_CHECKING:
+    from .coverage import CoverageMap
 
 
 @dataclass(frozen=True)
@@ -84,8 +88,20 @@ def check(
     repo: Path,
     python_exe: str | None = None,
     run_linters: bool = True,
+    coverage: "CoverageMap | None" = None,
 ) -> Plausibility:
     python_exe = python_exe or sys.executable
+
+    # A mutation on a line nothing executes is not a blind spot. It is uncovered
+    # code, which coverage.py reports for free and which needs no LLM to find.
+    # The finding this product exists for is a line that IS covered and still
+    # unconstrained.
+    if coverage is not None and coverage.measured:
+        if not coverage.is_covered(mutation.path, mutation.line):
+            return Plausibility(
+                False, "no existing test executes this line — uncovered code, not a blind spot"
+            )
+
     try:
         patched = mutation._patched_source(repo)
     except MutationError as exc:

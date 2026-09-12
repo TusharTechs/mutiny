@@ -7,6 +7,9 @@ license = { text = "Apache-2.0" }
 dependencies = [
     "pytest>=8.0",
     "openai>=1.40",
+    # The orchestrator reads the target's coverage database to find which tests
+    # execute a mutated line; pytest-cov is installed into the target, not here.
+    "coverage>=7.4",
 ]
 
 [project.optional-dependencies]

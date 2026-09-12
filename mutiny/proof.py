@@ -39,10 +39,7 @@ USER = """Module `{module}` ({path}):
 {module_source}
 ```
 
-The existing tests (they all pass on both versions — that is the problem):
-```python
-{test_source}
-```
+{tests_block}
 
 The mutation that survives them, at line {line}:
 ```diff
@@ -56,6 +53,20 @@ Write the test that catches it."""
 RETRY = """That test was rejected. {reason}
 
 Write a different test that fixes this. Same requirements as before."""
+
+COVERING = """These existing tests already execute the mutated line. Every one of them still
+passes after the mutation — that is exactly the gap you are closing. They also
+show how a caller reaches this code, so follow their approach:
+
+```python
+{examples}
+```"""
+
+FALLBACK = """The existing tests for this module (they all pass on both versions — that is the
+problem):
+```python
+{test_source}
+```"""
 
 _FENCE = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
 
@@ -87,7 +98,8 @@ def generate_proof_test(
     mutation: Mutation,
     module_import_name: str,
     target_function: str,
-    test_path: str,
+    test_path: str | None = None,
+    covering_tests: list[tuple[str, str]] | None = None,
     proof_test_path: str = "tests/test_mutiny_proof.py",
     model: str = SUPER,
     max_attempts: int = 3,
@@ -99,13 +111,24 @@ def generate_proof_test(
     import sys
 
     module_source = (repo / mutation.path).read_text(encoding="utf-8")
-    test_source = (repo / test_path).read_text(encoding="utf-8")
+
+    # The tests that already run this line are the single most useful thing we can
+    # show: without them the model cannot tell how a caller reaches internal code,
+    # and it writes a sound test of an adjacent function the mutation never touches.
+    if covering_tests:
+        examples = "\n\n".join(f"# {tid}\n{src}" for tid, src in covering_tests)
+        tests_block = COVERING.format(examples=examples)
+    elif test_path:
+        tests_block = FALLBACK.format(
+            test_source=(repo / test_path).read_text(encoding="utf-8"))
+    else:
+        tests_block = "No existing tests were found for this code."
 
     messages = [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": USER.format(
             module=module_import_name, path=mutation.path,
-            module_source=module_source, test_source=test_source,
+            module_source=module_source, tests_block=tests_block,
             line=mutation.line, original=mutation.original.strip(),
             mutated=mutation.mutated.strip(), function=target_function,
             bug_class=mutation.bug_class,
