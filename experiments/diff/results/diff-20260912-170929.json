@@ -1,0 +1,582 @@
+[
+  {
+    "sha": "fdec4ae1e5e296e890a5da0fb582b54f1af0da34",
+    "subject": "fix(next_version): reset prerelease when token changes (#339) ",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'semver.version' \u2014 the symbols are probably defined in a submodule. First: 'st"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with NameError in module 'semver.version' \u2014 the symbols are probably defined in a submodule. First: 'st"
+      }
+    ]
+  },
+  {
+    "sha": "a8bb4f89fc010b367d0925dc4da72c883d2d15d3",
+    "subject": "fix: replace deprecated semver.parse() with semver.Version.par",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "d8813b67a2ec5d579365f51a6d8f96d02f3fcbc3",
+    "subject": "Fix #460 Improve bump_prerelease to alway get a newer version ",
+    "path": "src/semver/version.py",
+    "fn": "Version.next_version",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 2,
+        "witnesses": [
+          "str(Version(1,2,3, prerelease=\"rc\").next_version(\"prerelease\"))\n    before: '1.2.3-rc'\n    after:  '1.2.3-rc.0'",
+          "str(Version(1,2,3, prerelease=\"rc\", build=\"1\").next_version(\"prerelease\"))\n    before: '1.2.3-rc'\n    after:  '1.2.3-rc.0'"
+        ]
+      },
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 2,
+        "witnesses": [
+          "str(Version(1,2,3, prerelease=\"rc\").next_version(\"prerelease\"))\n    before: '1.2.3-rc'\n    after:  '1.2.3-rc.0'",
+          "str(Version(1,2,3, prerelease=\"rc\", build=\"1\").next_version(\"prerelease\"))\n    before: '1.2.3-rc'\n    after:  '1.2.3-rc.0'"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "4b03f867a3deaecb07240f471fed9bf9c9072629",
+    "subject": "Fix #426: call subclass when deriving from Version",
+    "path": "src/semver/version.py",
+    "fn": "Version.replace",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 36,
+        "usable": 36,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 36,
+        "usable": 36,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "47b49cac131c24b1d3f9046ecb62fdace0c2de9e",
+    "subject": "Fix #258: Keep semver._deprecated.compare",
+    "path": "src/semver/_deprecated.py",
+    "fn": "compare",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "f8a182f5ec52ba29c60059d40a91e749d0f56df9",
+    "subject": "Fix #344 Allow empty string for bump methods",
+    "path": "src/semver/version.py",
+    "fn": "Version.bump_build",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 42,
+        "usable": 42,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 42,
+        "usable": 42,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "6176316e49c5279118178330d050548eefe71927",
+    "subject": "Fix return type of classmethod parse (#396)",
+    "path": "src/semver/version.py",
+    "fn": "Version.parse",
+    "expect": true,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 30,
+        "usable": 30,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 30,
+        "usable": 30,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "61335e0953dc4dbae2884aee5e96d45ac009f80f",
+    "subject": "General cleanup, reformat files",
+    "path": "src/semver/version.py",
+    "fn": "Version.parse",
+    "expect": false,
+    "repo": "python-semver",
+    "runs": [
+      {
+        "inputs": 26,
+        "usable": 26,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 26,
+        "usable": 26,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "39b31bc9b63abe98497409945e9d382d8918c8fb",
+    "subject": "Fix #405: Fix Cache.__setitem__ over-evicting when growing an ",
+    "path": "src/cachetools/__init__.py",
+    "fn": "Cache.__setitem__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 24,
+        "usable": 24,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 24,
+        "usable": 24,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "13bb86a55e36e501cf0b3e4c35db516ed9409fd7",
+    "subject": "Minor style improvements to keep ruff happy.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "Cache.__init__",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 37,
+        "usable": 37,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 37,
+        "usable": 37,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "c0fdf6abab38040947d6fe2e38c507401d5e2350",
+    "subject": "Fix TLRUCache silently keeping stale value on expired overwrit",
+    "path": "src/cachetools/__init__.py",
+    "fn": "TLRUCache.__setitem__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "98ec79ff8be24ce1346d6a96602f11ccbda4f76f",
+    "subject": "Drop \"class method\" from @cachedmethod docstring.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "cachedmethod",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 33,
+        "usable": 33,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 33,
+        "usable": 33,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "57d2e4813d9801f97034559e22428bac6f7c6c9b",
+    "subject": "Fix #387: Handle obj=None case for inspection in _DescriptorBa",
+    "path": "src/cachetools/_cachedmethod.py",
+    "fn": "_DescriptorBase.__get__",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "d3128001693d46f1a352fb940db18539cac34f99",
+    "subject": "Minor code readability improvements.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "TLRUCache.expire",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 8,
+        "usable": 8,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 8,
+        "usable": 8,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "cc0cf2299ec3c659b66e611a08926518b851a8b5",
+    "subject": "Minor style and readability improvements.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "LFUCache.__setitem__",
+    "expect": false,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 29,
+        "usable": 29,
+        "diverged": 15,
+        "witnesses": [
+          "c=LFUCache(2);c[\"a\"]=1;c[\"b\"]=2;c[\"c\"]=3;(len(c),sorted(c.items()))\n    before: (2, [('a', 1), ('c', 3)])\n    after:  (2, [('b', 2), ('c', 3)])",
+          "c=LFUCache(3);c[\"a\"]=1;c[\"b\"]=2;c[\"c\"]=3;c[\"a\"];c[\"a\"];c[\"d\"]=4;(len(c),sorted(c.items()))\n    before: (3, [('a', 1), ('c', 3), ('d', 4)])\n    after:  (3, [('a', 1), ('b', 2), ('d', 4)])"
+        ]
+      },
+      {
+        "inputs": 29,
+        "usable": 29,
+        "diverged": 16,
+        "witnesses": [
+          "c=LFUCache(2);c[\"a\"]=1;c[\"b\"]=2;c[\"c\"]=3;(len(c),sorted(c.items()))\n    before: (2, [('a', 1), ('c', 3)])\n    after:  (2, [('b', 2), ('c', 3)])",
+          "c=LFUCache(3);c[\"a\"]=1;c[\"b\"]=2;c[\"c\"]=3;c[\"a\"];c[\"a\"];c[\"d\"]=4;(len(c),sorted(c.items()))\n    before: (3, [('a', 1), ('c', 3), ('d', 4)])\n    after:  (3, [('a', 1), ('b', 2), ('d', 4)])"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "4d74eb46f507d231faa20f96c4285d36d38e021b",
+    "subject": "Fix #356: Improve RRCache performance.",
+    "path": "src/cachetools/__init__.py",
+    "fn": "RRCache.popitem",
+    "expect": true,
+    "repo": "cachetools",
+    "runs": [
+      {
+        "inputs": 41,
+        "usable": 41,
+        "diverged": 13,
+        "witnesses": [
+          "c=RRCache(maxsize=2);c['a']=1;c['b']=2;c.popitem()\n    before: ('a', 1)\n    after:  ('b', 2)",
+          "c=RRCache(maxsize=3);c['a']=1;c['b']=2;c['c']=3;c['d']=4;c.popitem()\n    before: ('c', 3)\n    after:  ('a', 1)"
+        ]
+      },
+      {
+        "inputs": 41,
+        "usable": 41,
+        "diverged": 14,
+        "witnesses": [
+          "c=RRCache(maxsize=2);c['a']=1;c['b']=2;c.popitem()\n    before: ('a', 1)\n    after:  ('b', 2)",
+          "c=RRCache(maxsize=2);c['a']=1;c['b']=2;(len(c),c.popitem())\n    before: (2, ('a', 1))\n    after:  (2, ('b', 2))"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "4e79787a31c99348649bb0dafee2a5078d3595be",
+    "subject": "fix(tags): preserve explicitly empty platform iterables (#1360",
+    "path": "src/packaging/tags.py",
+    "fn": "compatible_tags",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 44,
+        "witnesses": [
+          "list(compatible_tags())\n    before: [<py312-none-macosx_26_0_arm64 @ 4419563264>, <py312-none-macosx_26_0_universal2 @ 4419562240>, <py312-none-macosx_25_0_arm64 @ 4419562112>, <py312-none-macosx_25_0_universal2 @ 4419561984>, <py312-none-macosx_24_0_arm64 @ 4419561856>, <py312-none-macosx_24_0_universal2 @ 4419561728>, <py312-none-macosx_23_0_arm64 @ 4419561600>, <py312-none-macosx_23_0_universal2 @ 4419561472>, <py312-none-macosx_22_0_arm64 @ 4419561344>, <py312-none-macosx_22_0_universal2 @ 4419429184>, <py312-none-macosx_21_0_arm64 @ 4419561152>, <py312-none-macosx_21_0_universal2 @ 4419561024>, <py312-none-macosx_20_0_arm64\n    after:  [<py312-none-macosx_26_0_arm64 @ 4464897536>, <py312-none-macosx_26_0_universal2 @ 4464896512>, <py312-none-macosx_25_0_arm64 @ 4464896384>, <py312-none-macosx_25_0_universal2 @ 4464896256>, <py312-none-macosx_24_0_arm64 @ 4464896128>, <py312-none-macosx_24_0_universal2 @ 4464896000>, <py312-none-macosx_23_0_arm64 @ 4464895872>, <py312-none-macosx_23_0_universal2 @ 4464895744>, <py312-none-macosx_22_0_arm64 @ 4464895616>, <py312-none-macosx_22_0_universal2 @ 4464763648>, <py312-none-macosx_21_0_arm64 @ 4464895424>, <py312-none-macosx_21_0_universal2 @ 4464895296>, <py312-none-macosx_20_0_arm64",
+          "list(compatible_tags(python_version=(3,)))\n    before: [<py3-none-macosx_26_0_arm64 @ 4419752832>, <py3-none-macosx_26_0_universal2 @ 4419753856>, <py3-none-macosx_25_0_arm64 @ 4419753984>, <py3-none-macosx_25_0_universal2 @ 4419754112>, <py3-none-macosx_24_0_arm64 @ 4419754240>, <py3-none-macosx_24_0_universal2 @ 4419754368>, <py3-none-macosx_23_0_arm64 @ 4419754496>, <py3-none-macosx_23_0_universal2 @ 4419754624>, <py3-none-macosx_22_0_arm64 @ 4419754752>, <py3-none-macosx_22_0_universal2 @ 4419564480>, <py3-none-macosx_21_0_arm64 @ 4419754944>, <py3-none-macosx_21_0_universal2 @ 4419755072>, <py3-none-macosx_20_0_arm64 @ 4419755200>, <py3-none-\n    after:  [<py3-none-macosx_26_0_arm64 @ 4465087552>, <py3-none-macosx_26_0_universal2 @ 4465088576>, <py3-none-macosx_25_0_arm64 @ 4465088704>, <py3-none-macosx_25_0_universal2 @ 4465088832>, <py3-none-macosx_24_0_arm64 @ 4465088960>, <py3-none-macosx_24_0_universal2 @ 4465089088>, <py3-none-macosx_23_0_arm64 @ 4465089216>, <py3-none-macosx_23_0_universal2 @ 4465089344>, <py3-none-macosx_22_0_arm64 @ 4465089472>, <py3-none-macosx_22_0_universal2 @ 4464898880>, <py3-none-macosx_21_0_arm64 @ 4465089664>, <py3-none-macosx_21_0_universal2 @ 4465089792>, <py3-none-macosx_20_0_arm64 @ 4465089920>, <py3-none-"
+        ]
+      },
+      {
+        "inputs": 44,
+        "usable": 44,
+        "diverged": 44,
+        "witnesses": [
+          "list(compatible_tags())\n    before: [<py312-none-macosx_26_0_arm64 @ 4375850560>, <py312-none-macosx_26_0_universal2 @ 4375849536>, <py312-none-macosx_25_0_arm64 @ 4375849408>, <py312-none-macosx_25_0_universal2 @ 4375849280>, <py312-none-macosx_24_0_arm64 @ 4375849152>, <py312-none-macosx_24_0_universal2 @ 4375849024>, <py312-none-macosx_23_0_arm64 @ 4375848896>, <py312-none-macosx_23_0_universal2 @ 4375848768>, <py312-none-macosx_22_0_arm64 @ 4375848640>, <py312-none-macosx_22_0_universal2 @ 4375716608>, <py312-none-macosx_21_0_arm64 @ 4375848448>, <py312-none-macosx_21_0_universal2 @ 4375848320>, <py312-none-macosx_20_0_arm64\n    after:  [<py312-none-macosx_26_0_arm64 @ 4387155584>, <py312-none-macosx_26_0_universal2 @ 4387154560>, <py312-none-macosx_25_0_arm64 @ 4387154432>, <py312-none-macosx_25_0_universal2 @ 4387154304>, <py312-none-macosx_24_0_arm64 @ 4387154176>, <py312-none-macosx_24_0_universal2 @ 4387154048>, <py312-none-macosx_23_0_arm64 @ 4387153920>, <py312-none-macosx_23_0_universal2 @ 4387153792>, <py312-none-macosx_22_0_arm64 @ 4387153664>, <py312-none-macosx_22_0_universal2 @ 4387021568>, <py312-none-macosx_21_0_arm64 @ 4387153472>, <py312-none-macosx_21_0_universal2 @ 4387153344>, <py312-none-macosx_20_0_arm64",
+          "list(compatible_tags(python_version=(3,)))\n    before: [<py3-none-macosx_26_0_arm64 @ 4453635136>, <py3-none-macosx_26_0_universal2 @ 4453636160>, <py3-none-macosx_25_0_arm64 @ 4453636288>, <py3-none-macosx_25_0_universal2 @ 4453636416>, <py3-none-macosx_24_0_arm64 @ 4453636544>, <py3-none-macosx_24_0_universal2 @ 4453636672>, <py3-none-macosx_23_0_arm64 @ 4453636800>, <py3-none-macosx_23_0_universal2 @ 4453636928>, <py3-none-macosx_22_0_arm64 @ 4453637056>, <py3-none-macosx_22_0_universal2 @ 4375851904>, <py3-none-macosx_21_0_arm64 @ 4453637248>, <py3-none-macosx_21_0_universal2 @ 4453637376>, <py3-none-macosx_20_0_arm64 @ 4453637504>, <py3-none-\n    after:  [<py3-none-macosx_26_0_arm64 @ 4387345408>, <py3-none-macosx_26_0_universal2 @ 4387346432>, <py3-none-macosx_25_0_arm64 @ 4387346560>, <py3-none-macosx_25_0_universal2 @ 4387346688>, <py3-none-macosx_24_0_arm64 @ 4387346816>, <py3-none-macosx_24_0_universal2 @ 4387346944>, <py3-none-macosx_23_0_arm64 @ 4387347072>, <py3-none-macosx_23_0_universal2 @ 4387347200>, <py3-none-macosx_22_0_arm64 @ 4387347328>, <py3-none-macosx_22_0_universal2 @ 4387157056>, <py3-none-macosx_21_0_arm64 @ 4387347520>, <py3-none-macosx_21_0_universal2 @ 4387347648>, <py3-none-macosx_20_0_arm64 @ 4387347776>, <py3-none-"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "2d873eb6002021a8c007c933fbdab58b37a5079b",
+    "subject": "fix(metadata): fold every line boundary when writing headers (",
+    "path": "src/packaging/metadata.py",
+    "fn": "_Validator._process_summary",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 31,
+        "usable": 31,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 31,
+        "usable": 31,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "26fa1d42ccd98010d5fcf701dd10069e761b034c",
+    "subject": "fix: reject invalid interpreter tags (#1351)",
+    "path": "src/packaging/tags.py",
+    "fn": "parse_tag",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 25,
+        "witnesses": [
+          "parse_tag(\"py3-none-any\")\n    before: frozenset({<py3-none-any @ 4431356864>})\n    after:  frozenset({<py3-none-any @ 4450689984>})",
+          "parse_tag(\"py38-none-linux_x86_64\")\n    before: frozenset({<py38-none-linux_x86_64 @ 4431359680>})\n    after:  frozenset({<py38-none-linux_x86_64 @ 4450692800>})"
+        ]
+      },
+      {
+        "inputs": 25,
+        "usable": 25,
+        "diverged": 25,
+        "witnesses": [
+          "parse_tag(\"py3-none-any\")\n    before: frozenset({<py3-none-any @ 4430898112>})\n    after:  frozenset({<py3-none-any @ 4353123328>})",
+          "parse_tag(\"py38-none-linux_x86_64\")\n    before: frozenset({<py38-none-linux_x86_64 @ 4430900928>})\n    after:  frozenset({<py38-none-linux_x86_64 @ 4353126144>})"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "826426fc88773515fab149a5f6bde85761e57fbb",
+    "subject": "fix(pylock): respect an explicitly empty tag sequence in selec",
+    "path": "src/packaging/pylock.py",
+    "fn": "Pylock.select",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "generator produced no parseable inputs"
+      }
+    ]
+  },
+  {
+    "sha": "fe18f139c5b3d73cd9fdd9b25f1eda1b6fd7ba15",
+    "subject": "fix(requirements): normalize invalid specifier errors (#1332)",
+    "path": "src/packaging/requirements.py",
+    "fn": "Requirement.__init__",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 28,
+        "usable": 28,
+        "diverged": 0,
+        "witnesses": []
+      },
+      {
+        "inputs": 28,
+        "usable": 28,
+        "diverged": 0,
+        "witnesses": []
+      }
+    ]
+  },
+  {
+    "sha": "206834025040aca6f8a2fdfc4039dbfa2a9861a6",
+    "subject": "fix(metadata): aggregate from_email validation errors (#1268)",
+    "path": "src/packaging/metadata.py",
+    "fn": "Metadata.from_email",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 27,
+        "usable": 27,
+        "diverged": 24,
+        "witnesses": [
+          "Metadata.from_email(b\"Metadata-Version: 2.1\\nName: foo\\nVersion: 1.0\\nDescription: This is a\\n long description\")\n    before: <packaging.metadata.Metadata object at 0x1076ee180>\n    after:  <packaging.metadata.Metadata object at 0x1098e4410>",
+          "Metadata.from_email(b\"Metadata-Version: 2.1\\nName: foo\\nVersion: 1.0\\nSummary: \\xe2\\x9c\\x93\")\n    before: <packaging.metadata.Metadata object at 0x107666e70>\n    after:  <packaging.metadata.Metadata object at 0x109b44770>"
+        ]
+      },
+      {
+        "inputs": 27,
+        "usable": 27,
+        "diverged": 24,
+        "witnesses": [
+          "Metadata.from_email(b\"Metadata-Version: 2.1\\nName: foo\\nVersion: 1.0\\nDescription: This is a\\n long description\")\n    before: <packaging.metadata.Metadata object at 0x10563dc70>\n    after:  <packaging.metadata.Metadata object at 0x105d2f950>",
+          "Metadata.from_email(b\"Metadata-Version: 2.1\\nName: foo\\nVersion: 1.0\\nSummary: \\xe2\\x9c\\x93\")\n    before: <packaging.metadata.Metadata object at 0x100343140>\n    after:  <packaging.metadata.Metadata object at 0x105df7a70>"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "5b583e309996a085ad3b5b045f3bf50a09c11b58",
+    "subject": "fix: preserve marker quote semantics when serializing values (",
+    "path": "src/packaging/_parser.py",
+    "fn": "Value.serialize",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 36,
+        "usable": 35,
+        "diverged": 4,
+        "witnesses": [
+          "Value('\"').serialize()\n    before: '\"\"\"'\n    after:  '\\'\"\\''",
+          "Value('\"\"').serialize()\n    before: '\"\"\"\"'\n    after:  '\\'\"\"\\''"
+        ]
+      },
+      {
+        "inputs": 36,
+        "usable": 35,
+        "diverged": 4,
+        "witnesses": [
+          "Value('\"').serialize()\n    before: '\"\"\"'\n    after:  '\\'\"\\''",
+          "Value('\"\"').serialize()\n    before: '\"\"\"\"'\n    after:  '\\'\"\"\\''"
+        ]
+      }
+    ]
+  },
+  {
+    "sha": "9d0ec47b36a1bcdf705b397b84cd89272410a00d",
+    "subject": "fix(metadata): reject malformed Description-Content-Type value",
+    "path": "src/packaging/metadata.py",
+    "fn": "_Validator._process_description_content_type",
+    "expect": true,
+    "repo": "packaging",
+    "runs": [
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with AttributeError in module 'packaging.metadata' \u2014 the symbols are probably defined in a submodule. F"
+      },
+      {
+        "inputs": 0,
+        "usable": 0,
+        "diverged": 0,
+        "witnesses": [],
+        "error": "LookupError: every expression failed with AttributeError in module 'packaging.metadata' \u2014 the symbols are probably defined in a submodule. F"
+      }
+    ]
+  }
+]

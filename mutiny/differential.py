@@ -24,7 +24,20 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DRIVER = '''
-import ast, importlib, json, sys
+import ast, importlib, json, re, sys
+
+# repr() falls back to the object's memory address, which differs on every
+# process. Left alone it makes any object without a custom __repr__ diverge by
+# construction -- three of six apparent detections in one run were nothing but
+# differing addresses.
+_ADDRESS = re.compile(r"(?: at | @ )(?:0x[0-9a-fA-F]+|\d{6,})")
+_OPAQUE = re.compile(r"^<[\w.]+ object>$")
+
+
+def describe(value):
+    text = repr(value)[:600]
+    text = _ADDRESS.sub("", text)
+    return text, bool(_OPAQUE.match(text.strip()))
 
 module_name, out_path = sys.argv[1], sys.argv[2]
 exprs = json.load(open(sys.argv[3]))
@@ -56,9 +69,10 @@ for expr in exprs:
         value = run(expr, dict(base))
         rec["ok"] = True
         try:
-            rec["value"] = repr(value)[:600]
+            rec["value"], rec["opaque"] = describe(value)
         except Exception as exc:
             rec["value"] = f"<unreprable {type(value).__name__}: {exc}>"
+            rec["opaque"] = True
     except Exception as exc:
         rec["ok"] = False
         rec["error"] = f"{type(exc).__name__}: {exc}"[:400]
@@ -77,6 +91,7 @@ class Observation:
     ok: bool
     value: str | None = None
     error: str | None = None
+    opaque: bool = False
 
     @property
     def outcome(self) -> str:
@@ -129,7 +144,9 @@ def observe(
             )
         raw = json.loads(out.read_text())
     observations = [
-        Observation(r["input"], r["ok"], r.get("value"), r.get("error")) for r in raw
+        Observation(r["input"], r["ok"], r.get("value"), r.get("error"),
+                    r.get("opaque", False))
+        for r in raw
     ]
 
     # Every expression failing on an undefined name means we are looking in the
@@ -154,7 +171,14 @@ def compare(before: list[Observation], after: list[Observation]) -> list[Diverge
     out = []
     for b in before:
         a = index.get(b.input)
-        if a is not None and a.outcome != b.outcome:
+        if a is None:
+            continue
+        # `<Thing object>` tells us nothing about behaviour: two entirely
+        # different objects share that repr, so it can neither witness a
+        # divergence nor evidence agreement.
+        if b.opaque or a.opaque:
+            continue
+        if a.outcome != b.outcome:
             out.append(Divergence(b.input, b, a))
     return out
 
@@ -168,6 +192,8 @@ def agreement(before: list[Observation], after: list[Observation]) -> tuple[int,
         if a is None:
             continue
         compared += 1
+        if b.opaque or a.opaque:
+            continue
         usable += b.ok and a.ok
         diverged += a.outcome != b.outcome
     return compared, usable, diverged
