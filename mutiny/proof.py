@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .attacks import focused_module
 from .gate2 import GateResult, RuleResult, verify
-from .models import SUPER, NemotronClient
+from .models import SUPER, ULTRA, NemotronClient
 from .mutant import Mutation
 
 SYSTEM = """You write a single pytest test that proves a specific bug exists.
@@ -154,8 +154,12 @@ def generate_proof_test(
     covering_tests: list[tuple[str, str]] | None = None,
     proof_test_path: str = "tests/test_mutiny_proof.py",
     model: str = SUPER,
+    fallback_model: str = ULTRA,
     max_attempts: int = 3,
-    max_tokens: int = 3000,
+    # Nemotron reasons before answering and the trace is billed against this
+    # allowance, so a figure that looks generous for a short test is not. At
+    # 3000 Super returns nothing at all; at 16000 it answers.
+    max_tokens: int = 16000,
     repeats: int = 1,
     python_exe: str | None = None,
 ) -> list[ProofAttempt]:
@@ -196,6 +200,19 @@ def generate_proof_test(
             tag=f"proof:{mutation.id or mutation.path}:{n}",
         )
         source = extract_code(text)
+
+        # Super alone returns a completely empty response — no content and no
+        # reasoning — on certain prompts, at any allowance and any temperature.
+        # Nano, Lightning and Ultra do not. Switching models is the only remedy
+        # that works, so take it once rather than spending the attempt.
+        if not source.strip() and call.truncated and model != fallback_model:
+            text, call = client.complete(
+                messages, model=fallback_model, max_tokens=max_tokens,
+                temperature=0.3 if n > 1 else 0.0,
+                tag=f"proof-fallback:{mutation.id or mutation.path}:{n}",
+            )
+            source = extract_code(text)
+
         if not source.strip():
             attempts.append(ProofAttempt(
                 "", GateResult((RuleResult(

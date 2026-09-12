@@ -1,0 +1,650 @@
+[
+  {
+    "repo": "python-semver",
+    "sha": "0f18aa0b",
+    "subject": "Add optional native parser backend (minimal adapter) (#476",
+    "function": "Version.parse",
+    "applied": 4,
+    "malformed": 2,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 4,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 4,
+    "seconds": 88.1,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 670,
+        "bug_class": "dropped_guard",
+        "mutation": "_native_parse_parts -> None",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "boundary_drift",
+        "mutation": "not optional_minor_and_patch -> optional_minor_and_patch",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "numeric_type",
+        "mutation": "is not None -> is 0",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "temporal",
+        "mutation": "optional_minor_and_patch -> optional_minor_and_patch_temporal",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "fdec4ae1",
+    "subject": "fix(next_version): reset prerelease when token changes (#3",
+    "function": "Version.next_version",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 1,
+    "uncovered": 1,
+    "killed": 1,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.8,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "a8bb4f89",
+    "subject": "fix: replace deprecated semver.parse() with semver.Version",
+    "function": "Version.next_version",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 46.4,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "d8813b67",
+    "subject": "Fix #460 Improve bump_prerelease to alway get a newer vers",
+    "function": "Version.next_version",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 3,
+    "uncovered": 2,
+    "killed": 3,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 2.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "6208a548",
+    "subject": "Modernize project configs with uv & pyproject.toml",
+    "function": "find_version",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 3,
+    "uncovered": 3,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 37.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "0f301836",
+    "subject": "Improve private _nat_cmp() method",
+    "function": "Version.compare",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 26.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "9593ad08",
+    "subject": "Improve type hints to fix TODOs",
+    "function": "Version._nat_cmp",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 3,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 35.3,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "4b03f867",
+    "subject": "Fix #426: call subclass when deriving from Version",
+    "function": "Version.replace",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 79.8,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "655a7d06",
+    "subject": "Return dict instead of OrderedDict (#419)",
+    "function": "Version.to_dict",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 39.8,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "47b49cac",
+    "subject": "Fix #258: Keep semver._deprecated.compare",
+    "function": "compare",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 4,
+    "uncovered": 4,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 24.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "dd181c5a",
+    "subject": "Reject negative maxsize in Cache.__init__",
+    "function": "Cache.__init__",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 1,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 6.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "ccaa8c8c",
+    "subject": "Minor stylistic improvements.",
+    "function": "TLRUCache.__delitem",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 4,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 80.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "39b31bc9",
+    "subject": "Fix #405: Fix Cache.__setitem__ over-evicting when growing",
+    "function": "Cache.__setitem__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 4,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 1,
+    "seconds": 38.1,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 82,
+        "bug_class": "dropped_guard",
+        "mutation": "if -> elif",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_cache.py::CacheTest::test_clear",
+          "tests/test_cache.py::CacheTest::test_clear_getsizeof",
+          "tests/test_cache.py::CacheTest::test_delete",
+          "tests/test_cache.py::CacheTest::test_getsizeof_param"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "13bb86a5",
+    "subject": "Minor style improvements to keep ruff happy.",
+    "function": "Cache.__init__",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 26.6,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "c0fdf6ab",
+    "subject": "Fix TLRUCache silently keeping stale value on expired over",
+    "function": "TLRUCache.__setitem__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 6,
+    "uncovered": 6,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 29.3,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "d5c7eea7",
+    "subject": "Reject negative cache item sizes",
+    "function": "Cache.__setitem__",
+    "applied": 4,
+    "malformed": 2,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 3,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 64.6,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 79,
+        "bug_class": "numeric_type",
+        "mutation": "non-negative -> non_negative",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cache.py::CacheTest::test_getsizeof_negative",
+          "tests/test_fifo.py::FIFOCacheTest::test_getsizeof_negative",
+          "tests/test_lfu.py::LFUCacheTest::test_getsizeof_negative",
+          "tests/test_lru.py::LRUCacheTest::test_getsizeof_negative"
+        ],
+        "test": "from cachetools import Cache\n\ndef test_setitem_negative_size_error_contains_hyphen():\n    class NegativeSized:\n        def __sizeof__(self):\n            return -1\n\n    cache = Cache(maxsize=10)\n    try:\n        cache[\"key\"] = NegativeSized()\n    except ValueError as exc:\n        assert \"-\" in exc.args[0]\n    else:\n        assert False, \"Expected ValueError was not raised\"\n",
+        "gate": [
+          "1 passes on HEAD: verdicts=['failed_assertion']; F                                                                        [100%]\n=========================== short test summary info ============================\nFAILED tests/test_mutiny_proof.py::test_setitem_negative_size_error_contains_hyphen\n1 failed in 0.02s",
+          "5 rename-invariant: broke under rename (verdict=failed_assertion) \u2014 test encodes structure, not behaviour"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "bd3fbc49",
+    "subject": "Improve typing support.",
+    "function": "_wrapper",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 6,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 4,
+    "seconds": 97.7,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 414,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache -> wrapper.cach\u00e9",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "from cachetools import cachedmethod\n\ndef test_cachedmethod_wrapper_cache_attribute_refers_to_supplied_cache():\n    cache = {}\n    class Example:\n        @cachedmethod(lambda self: cache)\n        def method(self, x):\n            return x * 2\n    wrapper = Example.method\n    assert wrapper.cache is cache\n",
+        "gate": [
+          "3+4 public interface, asserts on values: compares object identity with `is` rather than value \u2014 identity is an implementation detail; embeds the original source span verbatim"
+        ]
+      },
+      {
+        "line": 414,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache -> wrapper.cache_",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "import unittest\nfrom cachetools import cachedmethod\n\nclass WrapperCacheAttributeTest(unittest.TestCase):\n    def test_wrapper_cache_attribute_refers_to_cache_object(self):\n        cache = {}\n        class C:\n            @cachedmethod(lambda self: cache)\n            def get(self, x):\n                return x\n\n        obj = C()\n        bound_method = obj.get          # bound method object\n        underlying_func = bound_method.__func__  # the wrapper function\n        self.assertEqual(getattr(underlying_func, 'cache', None), cache)\n",
+        "gate": [
+          "3+4 public interface, asserts on values: accesses '__func__' (introspection)"
+        ]
+      },
+      {
+        "line": 415,
+        "bug_class": "identity_and_keys",
+        "mutation": "cache_key -> cache_",
+        "attempts": 2,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 416,
+        "bug_class": "argument_transposition",
+        "mutation": "lock if lock is not None else cond -> cond if lock is not None else lock",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 416,
+        "bug_class": "argument_transposition",
+        "mutation": "else cond -> else lock",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      },
+      {
+        "line": 417,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache_condition -> wrapper.cache_conditio",
+        "attempts": 2,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "af5e6881",
+    "subject": "Minor @cachedmethod performance improvements.",
+    "function": "_WrapperBase.cache_condition",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 30.6,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "98ec79ff",
+    "subject": "Drop \"class method\" from @cachedmethod docstring.",
+    "function": "cachedmethod",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 6,
+    "uncovered": 6,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 15.0,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "57d2e481",
+    "subject": "Fix #387: Handle obj=None case for inspection in _Descript",
+    "function": "_DescriptorBase.__get__",
+    "applied": 0,
+    "malformed": 6,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 201.8,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "b9d249f5",
+    "subject": "perf(tests): disable more unused pytest plugins (#1390)",
+    "function": "downstream",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 166.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "053c8846",
+    "subject": "tags: add interpreter_abi (#611)",
+    "function": "interpreter_abi",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 2,
+    "uncovered": 1,
+    "killed": 3,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 1,
+    "seconds": 3.8,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 972,
+        "bug_class": "boundary_drift",
+        "mutation": "[:2] -> [:3]",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_tags.py::test_interpreter_abi"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "55cbf1b9",
+    "subject": "fix(ranges): stop unbounded bounds sorting above each othe",
+    "function": "UpperBound.__init__",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 3.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  }
+]
