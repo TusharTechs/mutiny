@@ -45,14 +45,29 @@ USER = """File `{path}`, function `{function}`:
 ```
 
 Produce {n} distinct mutations inside `{function}`. Line numbers are the real
-ones from the file, shown in the left column."""
+ones from the file, shown in the left column.{restriction}"""
+
+RESTRICTION = """
+
+Only mutate the lines marked with `>` in the left gutter. Those are the lines
+this change introduced, and they are the only ones under review. Lines without a
+marker are existing code shown for context — do not touch them."""
 
 _FENCE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
 
 
-def numbered_source(source: str, start: int, end: int) -> str:
+def numbered_source(
+    source: str, start: int, end: int, mark: tuple[int, ...] = ()
+) -> str:
+    """Line-numbered listing; lines in `mark` get an arrow so the model can see
+    which ones the change actually touched."""
     lines = source.splitlines()
-    return "\n".join(f"{i:5d} | {lines[i - 1]}" for i in range(start, min(end, len(lines)) + 1))
+    marked = set(mark)
+    out = []
+    for i in range(start, min(end, len(lines)) + 1):
+        gutter = ">" if i in marked else " "
+        out.append(f"{gutter}{i:5d} | {lines[i - 1]}")
+    return "\n".join(out)
 
 
 def function_span(source: str, name: str) -> tuple[int, int]:
@@ -86,6 +101,7 @@ def generate_mutations(
     n: int = 8,
     model: str = NANO,
     max_tokens: int = 14000,
+    only_lines: tuple[int, ...] | None = None,
 ) -> tuple[list[Mutation], list[str]]:
     """Return validated mutations plus the reasons any candidate was dropped."""
     source = (repo / rel_path).read_text(encoding="utf-8")
@@ -96,7 +112,9 @@ def generate_mutations(
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": USER.format(
                 path=rel_path, function=function,
-                numbered=numbered_source(source, lo, hi), n=n)},
+                numbered=numbered_source(source, lo, hi, only_lines or ()),
+                n=n,
+                restriction=RESTRICTION if only_lines else "")},
         ],
         model=model, max_tokens=max_tokens, temperature=0.4,
         tag=f"attacks:{rel_path}:{function}",
@@ -118,6 +136,9 @@ def generate_mutations(
             continue
         if not (lo <= m.line <= hi):
             rejected.append(f"{m.id}: line {m.line} outside {function} ({lo}-{hi})")
+            continue
+        if only_lines and m.line not in only_lines:
+            rejected.append(f"{m.id}: line {m.line} is context, not part of the change")
             continue
         try:
             m._patched_source(repo)  # proves the span exists exactly once
