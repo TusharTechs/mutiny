@@ -24,18 +24,36 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DRIVER = '''
-import importlib, json, sys
+import ast, importlib, json, sys
 
 module_name, out_path = sys.argv[1], sys.argv[2]
 exprs = json.load(open(sys.argv[3]))
 mod = importlib.import_module(module_name)
-ns = dict(vars(mod))
+base = dict(vars(mod))
+
+def run(snippet, ns):
+    """Statements, then a final expression whose value is the observation.
+
+    Stateful behaviour needs a sequence — filling a cache and then replacing an
+    entry with a larger one cannot be written as one expression — so a snippet
+    is executed and its trailing expression evaluated.
+    """
+    tree = ast.parse(snippet, mode="exec")
+    if not tree.body:
+        return None
+    if isinstance(tree.body[-1], ast.Expr):
+        head = ast.Module(body=tree.body[:-1], type_ignores=[])
+        exec(compile(head, "<snippet>", "exec"), ns)
+        tail = ast.Expression(body=tree.body[-1].value)
+        return eval(compile(tail, "<snippet>", "eval"), ns)
+    exec(compile(tree, "<snippet>", "exec"), ns)
+    return None
 
 results = []
 for expr in exprs:
     rec = {"input": expr}
     try:
-        value = eval(expr, ns)
+        value = run(expr, dict(base))
         rec["ok"] = True
         try:
             rec["value"] = repr(value)[:600]

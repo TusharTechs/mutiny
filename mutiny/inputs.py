@@ -15,9 +15,20 @@ from .models import NANO, NemotronClient
 SYSTEM = """You produce Python call expressions that exercise a function across
 its interesting behaviour.
 
-Each expression is evaluated inside the module's own namespace, so every public
-name in that module is already available to you — classes, constants, helpers.
-No imports, no assignments, no statements: one expression per line, nothing else.
+Each snippet runs inside the module's own namespace, so every public name in
+that module is already available to you — classes, constants, helpers. No
+imports, no function or class definitions, no loops.
+
+A snippet is usually a single expression. When the behaviour is stateful it may
+instead be a short sequence of statements separated by semicolons, ending in an
+expression whose value is what gets compared. Use that form whenever the
+interesting behaviour only appears after several operations — filling a
+container and then replacing an entry, for instance:
+
+    c = Cache(2, getsizeof=len); c["a"] = "x"; c["b"] = "yy"; c["b"] = "zzzz"; (dict(c), c.currsize)
+
+Put the whole snippet on one line. Compare-worthy values only: return a tuple of
+the things that matter rather than an object whose repr hides them.
 
 Aim for the edges, because that is where two versions of a function differ:
 boundary values, empty and single-element collections, zero and negative
@@ -29,7 +40,7 @@ Expressions that raise are fine and useful — a rejection is behaviour too. Do
 not attempt anything that touches the network, the filesystem, the clock or
 randomness, and never write an infinite loop.
 
-Return only a fenced python block containing one expression per line."""
+Return only a fenced python block containing one snippet per line."""
 
 USER = """Module `{module}`, the function under test is `{qualname}`:
 
@@ -37,8 +48,28 @@ USER = """Module `{module}`, the function under test is `{qualname}`:
 {source}
 ```
 
-{extra}Write {n} distinct call expressions that reach `{qualname}`. If it is a
-method, construct the receiver inline as part of the expression."""
+{extra}{receivers}Write {n} distinct snippets that reach `{qualname}`. If it is a
+method, construct the receiver inline as part of the snippet."""
+
+RECEIVERS = """`{owner}` may be a base class whose behaviour is only observable
+through a concrete subclass. These are available in this module, and you should
+use them rather than `{owner}` itself unless you are deliberately testing the
+base: {names}.
+
+"""
+
+BANNED_NAMES = {"open", "exec", "eval", "compile", "__import__", "input",
+                "exit", "quit", "breakpoint", "globals", "locals", "vars"}
+
+# Reject reaching *into* an object, not calling a dunder on it. Blocking every
+# attribute beginning with "__" also blocked `Cache().__setitem__(0, 0)`, which
+# is precisely the expression needed to exercise a __setitem__ under test — and
+# it silently discarded every input for two of the six validation cases.
+INTROSPECTION_ATTRS = {
+    "__code__", "__globals__", "__dict__", "__class__", "__closure__",
+    "__func__", "__wrapped__", "__subclasses__", "__bases__", "__mro__",
+    "__builtins__", "__loader__", "__spec__", "__reduce__", "__getattribute__",
+}
 
 _FENCE = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
 
@@ -49,17 +80,58 @@ def _valid(expr: str) -> bool:
     if not expr or expr.startswith("#"):
         return False
     try:
-        tree = ast.parse(expr, mode="eval")
+        tree = ast.parse(expr, mode="exec")
     except SyntaxError:
         return False
-    banned = {"open", "exec", "eval", "compile", "__import__", "input",
-              "exit", "quit", "breakpoint"}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Name) and node.id in banned:
+    if not tree.body or not isinstance(tree.body[-1], ast.Expr):
+        return False  # nothing to observe
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef,
+                             ast.AsyncFunctionDef, ast.ClassDef, ast.While,
+                             ast.Global, ast.Nonlocal)):
             return False
-        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in BANNED_NAMES:
+            return False
+        if isinstance(node, ast.Attribute) and node.attr in INTROSPECTION_ATTRS:
             return False
     return True
+
+
+def receiver_candidates(full_source: str, qualname: str) -> list[str]:
+    """Concrete subclasses that can stand in for the class owning `qualname`.
+
+    A method defined on an abstract base is often unobservable through the base
+    itself. cachetools' Cache.__setitem__ over-evicted when growing an entry,
+    but Cache.popitem raises NotImplementedError, so nothing is ever evicted and
+    the bug cannot appear — it only shows through LRUCache or LFUCache. Naming
+    the subclasses turns an undetectable change into a one-line reproduction.
+    """
+    if "." not in qualname:
+        return []
+    owner = qualname.rsplit(".", 2)[-2]
+    try:
+        tree = ast.parse(full_source)
+    except SyntaxError:
+        return []
+
+    parents: dict[str, list[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            parents[node.name] = [
+                b.id if isinstance(b, ast.Name) else getattr(b, "attr", "")
+                for b in node.bases
+            ]
+
+    found, frontier = [], {owner}
+    while frontier:
+        nxt = set()
+        for name, bases in parents.items():
+            if name not in found and name != owner and frontier & set(bases):
+                found.append(name)
+                nxt.add(name)
+        frontier = nxt
+    return found
 
 
 def extract(text: str) -> list[str]:
@@ -82,15 +154,109 @@ def generate(
     hint: str = "",
     model: str = NANO,
     max_tokens: int = 14000,
+    subclasses: list[str] | None = None,
 ) -> list[str]:
+    receivers = ""
+    if subclasses:
+        receivers = RECEIVERS.format(
+            owner=qualname.rsplit(".", 2)[-2], names=", ".join(subclasses[:8]))
     text, _ = client.complete(
         [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": USER.format(
                 module=module, qualname=qualname, source=source, n=n,
+                receivers=receivers,
                 extra=(hint + "\n\n") if hint else "")},
         ],
         model=model, max_tokens=max_tokens, temperature=0.7,
         tag=f"inputs:{module}:{qualname}",
     )
     return extract(text)
+
+
+REPAIR = """Of those {total} expressions, only {ok} could be evaluated. The rest
+failed on the unmodified code, so they cannot compare anything.
+
+The most common failures:
+
+{errors}
+
+{examples}Write {n} fresh expressions that actually run. Construct objects the
+way the working code does — check the constructor's real signature in the source
+above rather than guessing it."""
+
+
+def _error_digest(observations, limit: int = 6) -> str:
+    from collections import Counter
+
+    counts: Counter[str] = Counter()
+    samples: dict[str, str] = {}
+    for o in observations:
+        if o.ok:
+            continue
+        key = (o.error or "").split(":", 1)[0]
+        counts[key] += 1
+        samples.setdefault(key, f"{o.input}  ->  {o.error}")
+    return "\n".join(f"  {n}x  {samples[k]}" for k, n in counts.most_common(limit))
+
+
+def generate_validated(
+    client: NemotronClient,
+    module: str,
+    qualname: str,
+    source: str,
+    probe,
+    n: int = 45,
+    rounds: int = 2,
+    min_yield: float = 0.5,
+    covering_tests: list[tuple[str, str]] | None = None,
+    subclasses: list[str] | None = None,
+    model: str = NANO,
+):
+    """Generate inputs, run them against the unmodified code, and re-ask if too
+    few survive.
+
+    Checking the inputs before comparing anything costs one local execution and
+    is the difference between a usable run and forty-five expressions that fail
+    identically on both sides — which is indistinguishable from agreement.
+    """
+    hint = ""
+    if covering_tests:
+        joined = "\n\n".join(f"# {tid}\n{src}" for tid, src in covering_tests)
+        hint = ("These existing tests already exercise this code. They show how the "
+                f"objects involved are really constructed:\n\n```python\n{joined}\n```")
+
+    # Accumulate across rounds rather than keeping only the best one. Generation
+    # runs warm, so a round that yields little still usually yields something,
+    # and discarding it throws away inputs that cost the same as the ones kept.
+    # It also damps the run-to-run variance that makes small comparisons
+    # unreadable.
+    kept: dict[str, None] = {}
+    usable_obs: list = []
+    seen: set[str] = set()
+
+    for attempt in range(1, rounds + 1):
+        exprs = [
+            e for e in generate(client, module, qualname, source, n=n, hint=hint,
+                                model=model, subclasses=subclasses)
+            if e not in seen
+        ]
+        if not exprs:
+            if attempt == rounds:
+                break
+            continue
+        seen.update(exprs)
+        obs = probe(exprs)
+        usable = [o for o in obs if o.ok]
+        for o in usable:
+            kept.setdefault(o.input, None)
+        usable_obs += usable
+
+        rate = len(usable) / len(obs) if obs else 0.0
+        if rate >= min_yield or attempt == rounds:
+            break
+        hint = REPAIR.format(
+            total=len(obs), ok=len(usable), errors=_error_digest(obs),
+            examples=(hint + "\n\n") if covering_tests else "", n=n)
+
+    return list(kept), usable_obs

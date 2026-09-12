@@ -21,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from mutiny.attacks import focused_module
 from mutiny.differential import agreement, compare, observe
-from mutiny.inputs import generate
+from mutiny.coverage import covering_examples, measure
+from mutiny.inputs import generate_validated, receiver_candidates
 from mutiny.models import NemotronClient
 
 CHECKOUTS = Path(__file__).resolve().parents[1] / "phase1" / "checkouts"
@@ -61,6 +62,14 @@ def at(repo: Path, ref: str):
                        cwd=repo, capture_output=True)
 
 
+def guess_suite(repo: Path, source_path: str) -> str:
+    stem = Path(source_path).stem.lstrip("_")
+    for c in (f"tests/test_{stem}.py", f"tests/{stem}_test.py"):
+        if (repo / c).is_file():
+            return c
+    return "tests/"
+
+
 def source_at(repo: Path, ref: str, path: str) -> str:
     return subprocess.run(["git", "show", f"{ref}:{path}"], cwd=repo,
                           capture_output=True, text=True, check=True).stdout
@@ -95,14 +104,33 @@ def main() -> int:
             continue
 
         before_src = focused_module(source_at(repo, f"{sha}^", path), qualname)
-        exprs = generate(client, module, qualname, before_src, n=N_INPUTS)
-        print(f"  {len(exprs)} inputs generated from the pre-change source", flush=True)
-        if not exprs:
-            print("  SKIP — no usable inputs")
-            continue
 
         try:
             with at(repo, f"{sha}^"):
+                # Existing tests show how these objects are really constructed;
+                # guessing a constructor's signature is how 45 inputs ended up
+                # failing identically on both sides, which reads as agreement.
+                examples = []
+                cov = measure(repo, guess_suite(repo, path), module.split(".")[0], python_exe)
+                if cov.measured:
+                    lines = sorted(cov.covered_lines(path))
+                    for ln in lines:
+                        examples = covering_examples(repo, cov, path, ln, limit=2)
+                        if examples:
+                            break
+
+                subclasses = receiver_candidates(
+                    source_at(repo, f"{sha}^", path), qualname)
+                exprs, usable_obs = generate_validated(
+                    client, module, qualname, before_src,
+                    probe=lambda e: observe(repo, module, e, python_exe),
+                    n=N_INPUTS, covering_tests=examples, subclasses=subclasses)
+                print(f"  {len(exprs)} inputs, {len(usable_obs)} run cleanly on the "
+                      f"pre-change code" + (f" ({len(examples)} test examples shown)"
+                                            if examples else ""), flush=True)
+                if not exprs:
+                    print("  SKIP — no usable inputs")
+                    continue
                 before = observe(repo, module, exprs, python_exe)
             with at(repo, sha):
                 after = observe(repo, module, exprs, python_exe)
