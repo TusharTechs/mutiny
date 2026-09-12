@@ -27,11 +27,24 @@ BOUNDARY = Mutation(
     path="pricing.py", line=7, original=">=", mutated=">",
     bug_class="boundary_drift", id="M1",
 )
-# Behaviourally equivalent: at value == lo, returning `lo` and returning `value`
-# produce the same result. No test can separate them.
-EQUIVALENT = Mutation(
+# Looks equivalent, is not. At value == lo the two branches return numbers that
+# compare equal -- but `-0.0` and `0.0` compare equal while being distinguishable
+# by math.copysign, so a test CAN separate them. Nemotron found this; we had
+# labelled it equivalent and were wrong. Kept under an honest name as a reminder
+# that "equivalent" is much rarer than it looks.
+SUBTLE = Mutation(
     path="pricing.py", line=15, original="<", mutated="<=",
     bug_class="boundary_drift", id="M2",
+)
+EQUIVALENT = SUBTLE  # back-compat for the tests below that only need a survivor
+
+# Genuinely equivalent: `total = total + count` and `total += count` cannot be
+# distinguished for any input that reaches this loop, since `total` starts as an
+# int and in-place addition on int is not in-place. Adversarial doubles that
+# would separate them are rejected by the static rules.
+TRULY_EQUIVALENT = Mutation(
+    path="pricing.py", line=32, original="total = total + count",
+    mutated="total += count", bug_class="redundant_rewrite", id="M4",
 )
 CONSTANT = Mutation(
     path="pricing.py", line=22, original="0.9", mutated="0.95",
@@ -137,6 +150,85 @@ def test_static_rules_reject_cheats(source, expect):
     problems = static_violations(source, BOUNDARY)
     assert problems, f"should have been rejected, expected mention of {expect}"
     assert any(expect in p for p in problems), problems
+
+
+IDENTITY = """
+from pricing import clamp
+
+
+def test_clamp_returns_unchanged_at_boundary():
+    lo = 5.0
+    value = lo + 0.0
+    assert clamp(value, lo) is value
+"""
+
+
+def test_identity_assertion_is_rejected():
+    """Nemotron found this one: `is` separates an otherwise equivalent mutant by
+    object identity, which no caller should depend on."""
+    problems = static_violations(IDENTITY, EQUIVALENT)
+    assert any("identity" in p for p in problems), problems
+
+
+def test_identity_against_singletons_is_allowed():
+    ok = """
+from pricing import discount
+
+
+def test_returns_a_number():
+    assert discount(100.0) is not None
+"""
+    assert static_violations(ok, BOUNDARY) == []
+
+
+ADVERSARIAL_DOUBLE = """
+from pricing import clamp
+
+
+class _Dummy:
+    def __lt__(self, other):
+        return False
+
+    def __le__(self, other):
+        return True
+
+    def __eq__(self, other):
+        return isinstance(other, _Dummy)
+
+
+def test_clamp_returns_input_when_equal_to_threshold():
+    assert clamp(_Dummy(), 3.14) == _Dummy()
+"""
+
+
+def test_adversarial_double_is_rejected():
+    """Nemotron's second escape: a type whose < and <= disagree by construction
+    separates the operators without describing real behaviour."""
+    problems = static_violations(ADVERSARIAL_DOUBLE, EQUIVALENT)
+    assert any("adversarial double" in p for p in problems), problems
+
+
+def test_plain_data_class_is_still_allowed():
+    ok = """
+from dataclasses import dataclass
+from pricing import discount
+
+
+@dataclass
+class Order:
+    subtotal: float
+
+
+def test_order_total():
+    assert discount(Order(100.0).subtotal) == 90.0
+"""
+    assert static_violations(ok, BOUNDARY) == []
+
+
+def test_narrating_the_mutation_is_rejected():
+    source = GOOD + "\n# On the mutated version this returns 100.0\n"
+    problems = static_violations(source, BOUNDARY)
+    assert any("describes the mutation" in p for p in problems), problems
 
 
 def test_static_rules_accept_the_honest_test():

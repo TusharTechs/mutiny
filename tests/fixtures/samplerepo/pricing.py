@@ -23,3 +23,11 @@ def validate_rate(rate):
     if rate > ceiling:
         raise ValueError(f"{rate=} exceeds {ceiling=}")
     return rate
+
+
+def total_items(counts):
+    """Sum a sequence of item counts."""
+    total = 0
+    for count in counts:
+        total = total + count
+    return total

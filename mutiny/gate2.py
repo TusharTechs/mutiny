@@ -32,6 +32,28 @@ FORBIDDEN_ATTRS = {
     "__code__", "__wrapped__", "__globals__", "__func__", "__closure__",
     "co_code", "co_consts", "_getframe", "__subclasshook__",
 }
+# `x is y` on non-singletons asserts on object identity, which is an
+# implementation detail no caller should depend on -- and a reliable way to
+# distinguish a mutant that is otherwise behaviourally equivalent.
+IDENTITY_SINGLETONS = {None, True, False}
+
+# A test that defines its own type overriding comparison or coercion can
+# separate almost any mutation -- an object whose __lt__ is always False and
+# whose __le__ is always True distinguishes `<` from `<=` without saying
+# anything about how the function behaves for the inputs it is written for.
+ADVERSARIAL_DUNDERS = {
+    "__lt__", "__le__", "__gt__", "__ge__", "__eq__", "__ne__", "__hash__",
+    "__bool__", "__len__", "__index__", "__int__", "__float__", "__round__",
+    "__add__", "__sub__", "__mul__", "__truediv__", "__floordiv__", "__mod__",
+    "__contains__", "__iter__", "__getitem__",
+}
+
+# A proof test should read as a test someone would have written anyway. Prose
+# about "the mutant" or "the original implementation" means it was written to
+# separate a diff, not to describe behaviour.
+MUTATION_TELLS = ("mutant", "mutated version", "original implementation",
+                  "mutated implementation", "the mutation")
+
 PROTOCOL_ASSERT_ATTRS = {
     "assert_called", "assert_called_once", "assert_called_with",
     "assert_called_once_with", "assert_has_calls", "assert_any_call",
@@ -105,6 +127,21 @@ def static_violations(
             for alias in node.names:
                 if alias.name.startswith("_") and not alias.name.startswith("__"):
                     problems.append(f"imports private name {alias.name!r}")
+        elif isinstance(node, ast.Compare):
+            if not allow_protocol_assertions:
+                for op, right in zip(node.ops, node.comparators):
+                    if not isinstance(op, (ast.Is, ast.IsNot)):
+                        continue
+                    operands = (node.left, right)
+                    if any(
+                        isinstance(o, ast.Constant) and o.value in IDENTITY_SINGLETONS
+                        for o in operands
+                    ):
+                        continue  # `x is None` and friends are fine
+                    problems.append(
+                        "compares object identity with `is` rather than value — "
+                        "identity is an implementation detail"
+                    )
         elif isinstance(node, ast.Attribute):
             attr = node.attr
             if attr in FORBIDDEN_ATTRS:
@@ -122,6 +159,26 @@ def static_violations(
         needle = span.strip()
         if len(needle) >= 12 and needle in source:
             problems.append(f"embeds the {label} source span verbatim")
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        overridden = {
+            child.name
+            for child in node.body
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+        } & ADVERSARIAL_DUNDERS
+        if overridden:
+            problems.append(
+                f"defines {node.name!r} overriding {', '.join(sorted(overridden))} — "
+                "an adversarial double, not an input the function is written for"
+            )
+
+    lowered = source.lower()
+    for tell in MUTATION_TELLS:
+        if tell in lowered:
+            problems.append(f"describes the mutation ({tell!r}) instead of the behaviour")
+            break
 
     if not any(
         isinstance(n, ast.FunctionDef) and n.name.startswith("test_")

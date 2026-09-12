@@ -7,3 +7,5 @@ __pycache__/
 .ruff_cache/
 experiments/phase1/results/*.json
 experiments/phase1/checkouts/
+certs/
+.cache/

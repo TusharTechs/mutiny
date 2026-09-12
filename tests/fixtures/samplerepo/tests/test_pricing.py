@@ -1,7 +1,7 @@
 """The existing suite: good coverage, no boundary cases. Every line executes."""
 import pytest
 
-from pricing import clamp, discount, validate_rate
+from pricing import clamp, discount, total_items, validate_rate
 
 
 def test_small_order_gets_no_discount():
@@ -27,3 +27,7 @@ def test_rate_above_ceiling_rejected():
 
 def test_rate_below_ceiling_allowed():
     assert validate_rate(0.5) == 0.5
+
+
+def test_total_items_sums():
+    assert total_items([1, 2, 3]) == 6
