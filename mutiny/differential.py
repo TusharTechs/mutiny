@@ -114,7 +114,10 @@ for expr in exprs:
         rec["error"] = f"{type(exc).__name__} (fatal)"
     results.append(rec)
 
-json.dump(results, open(out_path, "w"))
+if out_path == "-":
+    sys.stdout.write("\x00MUTINY\x00" + json.dumps(results))
+else:
+    json.dump(results, open(out_path, "w"))
 '''
 
 

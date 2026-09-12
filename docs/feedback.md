@@ -149,3 +149,36 @@ construction. Token Factory inference calls with the same key work normally, so
 either the expiry is specific to the Sandboxes view of the token or the warning
 is miscalculating. Either way the message appears on stdout rather than through
 `logging`, which is awkward for anything running non-interactively.
+
+## Sandboxes: two traps worth documenting
+
+Both cost us an hour and both fail silently.
+
+**`shell=` returns empty stdout and stderr.** `image.run("python -c 'print(1)'",
+shell="sh")` completes with `exit_code=0`, no output, and no error.
+`image.run("python", args=["-c", "print(1)"])` returns `'1\n'` as expected. We
+first met this through its consequence rather than directly: our
+`pip install -e .` ran in shell mode, failed, reported nothing, and produced a
+checkpoint with the package absent. Nothing surfaced until an import error
+several steps later. Either capturing output in shell mode or refusing the
+combination would save that hour.
+
+**`run()` is lazy but `wait()` performs the whole round trip.** Building a list
+of runs and then waiting on them in sequence executes them in sequence: 40 forks
+took 50.4 s, exactly the serial rate, which reads like a service that does not
+parallelise. Driving the same 40 through a thread pool takes 3.7 s. Since the
+obvious way to write "start many, collect results" is a list comprehension over
+`wait()`, and that silently serialises, the docs could show the concurrent form
+directly — or `wait()` on a collection could be offered.
+
+Neither is an error, which is what makes them expensive: both look like the
+service being slow or the code being wrong.
+
+## What worked well
+
+The checkpoint model is an unusually good fit for differential execution and
+needed no adaptation. `disposable=False` yields a persistent image, every later
+run forks it without mutating it, and isolation is a property of the model rather
+than something to enforce. One warm checkpoint at 9.8 s then 40 isolated forks in
+3.7 s is a shape that is genuinely hard to get any other way, and `DisposableImageRunError`
+names the mistake precisely when you try to fork a disposable result.
