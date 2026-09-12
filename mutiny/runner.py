@@ -107,7 +107,7 @@ def run_pytest(
         cmd = [
             python_exe, "-m", "pytest", *selectors,
             "-p", "mutiny_probe",
-            "-p", "no:cacheprovider",
+            "-p", "no:cacheprovider", "--rootdir", str(root),
             "-q", "--tb=no", "--no-header",
             *extra_args,
         ]

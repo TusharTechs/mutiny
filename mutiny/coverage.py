@@ -67,7 +67,7 @@ def measure(
             [
                 python_exe, "-m", "pytest", selector,
                 f"--cov={package}", "--cov-context=test", "--cov-report=",
-                "-p", "no:cacheprovider", "-q", "--tb=no", "--no-header",
+                "-p", "no:cacheprovider", "--rootdir", str(repo), "-q", "--tb=no", "--no-header",
             ],
             cwd=repo, env=env, capture_output=True, text=True, timeout=timeout,
         )

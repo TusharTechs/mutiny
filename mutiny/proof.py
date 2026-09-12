@@ -9,7 +9,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .gate2 import GateResult, verify
+from .attacks import focused_module
+from .gate2 import GateResult, RuleResult, verify
 from .models import SUPER, NemotronClient
 from .mutant import Mutation
 
@@ -110,7 +111,8 @@ def generate_proof_test(
     """Generate, verify, and on failure re-ask with the gate's own complaint."""
     import sys
 
-    module_source = (repo / mutation.path).read_text(encoding="utf-8")
+    whole = (repo / mutation.path).read_text(encoding="utf-8")
+    module_source = focused_module(whole, target_function)
 
     # The tests that already run this line are the single most useful thing we can
     # show: without them the model cannot tell how a caller reaches internal code,
@@ -143,6 +145,14 @@ def generate_proof_test(
             tag=f"proof:{mutation.id or mutation.path}:{n}",
         )
         source = extract_code(text)
+        if not source.strip():
+            attempts.append(ProofAttempt(
+                "", GateResult((RuleResult(
+                    "0 model returned no content", "fail",
+                    f"truncated at {max_tokens} tokens with empty content and empty "
+                    f"reasoning — the prompt is too large, not the allowance too small",
+                ),)), n, call.cost_usd, call.seconds, call.truncated))
+            break
         gate = verify(
             repo, mutation, source, proof_test_path,
             target_function=target_function,

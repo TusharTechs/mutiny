@@ -78,6 +78,43 @@ def function_span(source: str, name: str) -> tuple[int, int]:
     return node.lineno, (node.end_lineno or node.lineno)
 
 
+def focused_module(
+    source: str, qualname: str, max_header: int = 70, pad: int = 6
+) -> str:
+    """The module header plus the target function, not the whole file.
+
+    Shipping an entire module costs thousands of tokens and actively hurts: given
+    1,000 lines of context for a task that concerns one function, Nemotron reasons
+    until it exhausts its output allowance and returns nothing at all.
+    """
+    lines = source.splitlines()
+    try:
+        lo, hi = function_span(source, qualname)
+    except ValueError:
+        return source
+
+    import ast as _ast
+
+    header_end = 0
+    for node in _ast.parse(source).body:
+        if isinstance(node, (_ast.Import, _ast.ImportFrom, _ast.Assign, _ast.Expr)):
+            header_end = max(header_end, node.end_lineno or node.lineno)
+        elif isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+            break
+    header_end = min(header_end, max_header)
+
+    start = max(header_end + 1, lo - pad)
+    end = min(len(lines), hi + pad)
+
+    out = lines[:header_end]
+    if start > header_end + 1:
+        out.append(f"\n# ... {start - header_end - 1} lines elided ...\n")
+    out += lines[start - 1 : end]
+    if end < len(lines):
+        out.append(f"\n# ... {len(lines) - end} lines elided ...")
+    return "\n".join(out)
+
+
 def _parse(text: str) -> list[dict]:
     blocks = _FENCE.findall(text)
     raw = max(blocks, key=len) if blocks else text
