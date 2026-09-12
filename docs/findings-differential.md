@@ -129,3 +129,59 @@ The confirmed detections are real and specific — semver's `bump_prerelease`
 producing `'.0'` where it produced `''`, cachetools' `RRCache.popitem` returning
 a different entry, and packaging's marker serialisation turning `'"""'` into
 `'\'"\''`.
+
+---
+
+# Agent refactor safety — the product's real question
+
+Nemotron refactors a real function; the repository's tests judge it; the
+differential is run regardless, so the refactors the tests *rejected* serve as
+ground truth for whether we would have been a safety net without them.
+
+Twenty-one functions across semver, cachetools and packaging.
+
+| | |
+|---|---|
+| refactors produced | 18/21 |
+| broken — tests rejected them | **3/18 = 17%** |
+| of the known-broken, differential also caught | **1/3 = 33%** |
+| of the 13 tests accepted, behaviour changed | **0/13** |
+| cost | $0.08 for the set |
+
+## Three things this establishes
+
+**The problem is real and we reproduced it.** 17% of refactors from a frontier
+open model were functionally incorrect, against a published range of 19-35%.
+
+**False positives remain at zero.** Thirteen correct refactors, thirteen
+silences. Across every experiment today — five behaviour-preserving commits and
+now thirteen good refactors — the harness has never once cried wolf. That is the
+property that decides whether a team leaves a tool switched on, and it is the
+number this project can defend.
+
+**Detection is partial and the gap has a shape.** One of three. Both misses were
+`Cache.__setitem__` and `LRUCache.popitem` — stateful methods whose behaviour
+only emerges from a sequence of operations under capacity pressure.
+
+## The weakness is the same one, three times over
+
+It has now appeared in three unrelated experiments: cachetools' over-eviction
+fix needed `LRUCache` rather than the abstract base and a three-step sequence;
+`Cache.__setitem__` is still missed; `LRUCache.popitem` is still missed.
+
+Single call expressions test functions. Stateful classes need *scenarios*:
+construct with a specific capacity and sizing function, fill past that capacity,
+then act. The generator can write those — it did for the hand-checked case — but
+it does not reliably reach for them.
+
+The existing tests are the obvious source. cachetools' own suite is full of
+exactly these sequences, and coverage already tells us which tests reach the
+changed line. Showing those sequences as templates, rather than as generic
+examples of construction, is the next thing to try.
+
+## Honest position
+
+Detection is 62% on human `fix:` commits and 33% on known-broken agent
+refactors. Neither is a finished product. What is solid is the direction and the
+precision: the mechanism produces concrete, reproducible, one-line witnesses, it
+costs about a cent per function, and it has never produced a false alarm.

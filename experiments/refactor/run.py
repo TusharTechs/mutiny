@@ -69,10 +69,10 @@ class Case:
     def outcome(self) -> str:
         if not self.refactored:
             return "no refactor produced"
-        if not self.tests_pass:
-            return "rejected by tests"
         if not self.inputs:
             return "unmeasured"
+        if not self.tests_pass:
+            return "broken; we CAUGHT it" if self.divergent else "broken; we MISSED it"
         return "BREAKS, tests missed it" if self.divergent else "preserved"
 
 
@@ -111,8 +111,11 @@ def run_case(client, repo, repo_name, path, module, qualname, python_exe, suite)
             c.tests_pass = run.verdict == PASSED
         finally:
             restore(repo, path)
-        if not c.tests_pass:
-            return c
+        # Measure these too rather than returning. A refactor the tests rejected
+        # is known-broken, which makes it ground truth: if the differential does
+        # not flag it, it would not have been a safety net where the suite is
+        # thinner — and most code has a thinner suite than these three.
+        
 
         # Tests passed. Did behaviour actually survive?
         examples = covering_examples(repo, cov, path, function_span(original, qualname)[0], limit=2) \
@@ -182,19 +185,25 @@ def main() -> int:
         print(f"{c.repo:<15}{c.qualname:<30}{c.outcome:<28}{c.divergent:>4}")
     print("-" * 78)
     produced = [c for c in cases if c.refactored]
-    passed = [c for c in produced if c.tests_pass]
-    measured = [c for c in passed if c.inputs]
-    broke = [c for c in measured if c.divergent]
+    rejected = [c for c in produced if not c.tests_pass and c.inputs]
+    passed = [c for c in produced if c.tests_pass and c.inputs]
+    caught = [c for c in rejected if c.divergent]
+    missed_by_tests = [c for c in passed if c.divergent]
     print(f"  refactors produced:               {len(produced)}/{len(cases)}")
     if produced:
-        print(f"  rejected by the existing tests:   {len(produced)-len(passed)}/{len(produced)}"
-              f" = {100*(len(produced)-len(passed))/len(produced):.0f}%")
-    if measured:
-        print(f"  of those that PASSED the tests:")
-        print(f"    behaviour changed anyway:       {len(broke)}/{len(measured)}"
-              f" = {100*len(broke)/len(measured):.0f}%   <- tests missed these")
-        print(f"    behaviour preserved:            {len(measured)-len(broke)}/{len(measured)}")
-    print(f"  unmeasured (no usable inputs):    {len(passed)-len(measured)}/{len(passed) or 1}")
+        n_bad = len([c for c in produced if not c.tests_pass])
+        print(f"  broken (tests rejected them):     {n_bad}/{len(produced)}"
+              f" = {100*n_bad/len(produced):.0f}%"
+              f"   (published: 19-35% of LLM refactors are incorrect)")
+    if rejected:
+        print(f"  of the known-broken refactors:")
+        print(f"    differential also caught:       {len(caught)}/{len(rejected)}"
+              f" = {100*len(caught)/len(rejected):.0f}%"
+              f"   <- would we be a safety net where tests are thinner?")
+    if passed:
+        print(f"  of the refactors tests ACCEPTED:")
+        print(f"    behaviour changed anyway:       {len(missed_by_tests)}/{len(passed)}")
+        print(f"    behaviour preserved (silent):   {len(passed)-len(missed_by_tests)}/{len(passed)}")
     print(f"  spend: ${client.ledger.total_usd - opening:.4f}")
     print(f"\n  written: {out.name}")
     return 0
