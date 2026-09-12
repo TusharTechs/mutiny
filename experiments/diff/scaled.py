@@ -165,7 +165,7 @@ def one_run(client, repo, module, case, python_exe) -> dict:
                     "error": "generator produced no parseable inputs"}
         before = observe(repo, module, exprs, python_exe)
     with at(repo, sha):
-        after = observe(repo, module, exprs, python_exe)
+        after = observe(repo, module, exprs, python_exe, baseline=False)
 
     divs = compare(before, after)
     idx = {o.input: o for o in after}

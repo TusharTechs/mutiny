@@ -179,8 +179,16 @@ def observe(
     expressions: list[str],
     python_exe: str | None = None,
     timeout: int = 300,
+    baseline: bool = True,
 ) -> list[Observation]:
-    """Evaluate each expression in `module`'s namespace, recording what happened."""
+    """Evaluate each expression in `module`'s namespace, recording what happened.
+
+    `baseline` says whether this is the unmodified side. Only there does a batch
+    in which everything fails on an undefined name mean we are misconfigured. On
+    the modified side it usually means the opposite — the change broke the module
+    outright, which is the most emphatic finding available, and raising on it
+    threw away a true detection.
+    """
     python_exe = python_exe or sys.executable
     with tempfile.TemporaryDirectory(prefix="mutiny-diff-") as tmp:
         tmpd = Path(tmp)
@@ -207,11 +215,11 @@ def observe(
         for r in raw
     ]
 
-    # Every expression failing on an undefined name means we are looking in the
-    # wrong module, not that the inputs were bad. Reported as zero usable inputs
-    # this is indistinguishable from a hard problem, and it silently cost ten of
-    # nineteen cases in one run. Fail loudly instead.
-    if observations and all(not o.ok for o in observations):
+    # On the unmodified side, every expression failing on an undefined name means
+    # we are looking in the wrong module rather than that the inputs were bad.
+    # Reported as zero usable inputs that is indistinguishable from a hard
+    # problem, and it silently cost ten of nineteen cases in one run.
+    if baseline and observations and all(not o.ok for o in observations):
         kinds = {(o.error or "").split(":", 1)[0] for o in observations}
         if kinds <= {"NameError", "AttributeError", "ImportError", "ModuleNotFoundError"}:
             raise LookupError(

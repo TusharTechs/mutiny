@@ -51,6 +51,10 @@ numbers, None where it is permitted, values that differ only in case or
 whitespace, the largest and smallest plausible values, strings that nearly
 parse, and ordinary well-formed values for contrast.
 
+Exercise optional arguments both ways. Omitting one is a distinct code path,
+frequently the most used and the least tested, so let a good share of your
+snippets simply leave them out.
+
 Expressions that raise are fine and useful — a rejection is behaviour too. Do
 not attempt anything that touches the network, the filesystem, the clock or
 randomness, and never write an infinite loop.
@@ -68,17 +72,21 @@ method, construct the receiver inline as part of the snippet."""
 
 STATEFUL = """`{owner}` accumulates state, so a single call reveals almost
 nothing about it. Write scenarios rather than calls. A scenario constructs the
-object with a definite capacity and sizing rule, drives it through several
-operations — including past its capacity — and then observes everything that
-matters at once:
+object, drives it through several operations — including past its capacity — and
+then observes everything that matters at once:
 
     c = LRUCache(maxsize=3, getsizeof=len); c["a"]="x"; c["b"]="yy"; c["b"]="zzzz"; (sorted(c.items()), c.currsize, len(c))
 
-Vary deliberately across your snippets: the capacity, the sizes of the values,
-whether a key is new or being replaced, whether the replacement is larger or
-smaller, the order of access before the operation, and how far past capacity the
-sequence goes. The boundary where something is evicted is where two versions
-differ.
+Vary the construction as deliberately as the operations. **Leave the optional
+arguments out of roughly half your snippets.** A default is a separate code path
+and usually the most heavily used one — a refactor of cachetools' Cache broke
+only when no sizing function was given, because the default is a sentinel object
+rather than a dict, and every snippet that passed one behaved identically.
+
+Then vary: the capacity, the sizes of the values, whether a key is new or being
+replaced, whether the replacement is larger or smaller, the order of access
+before the operation, and how far past capacity the sequence goes. The boundary
+where something is evicted is where two versions differ.
 
 Always end with a tuple of the observable state — contents, size, length — never
 the object itself, whose repr hides exactly what changed.

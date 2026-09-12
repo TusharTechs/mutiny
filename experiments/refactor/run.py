@@ -134,7 +134,7 @@ def run_case(client, repo, repo_name, path, module, qualname, python_exe, suite)
         before = observe(repo, module, exprs, python_exe)
         (repo / path).write_text(patched, encoding="utf-8")
         try:
-            after = observe(repo, module, exprs, python_exe)
+            after = observe(repo, module, exprs, python_exe, baseline=False)
         finally:
             restore(repo, path)
 
