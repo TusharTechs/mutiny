@@ -1,7 +1,15 @@
 """Ask Nemotron for call expressions that exercise a function hard.
 
 This is the model's whole job in the differential design, and it is a much
-easier job than writing a proof test. A bad input costs one execution on each
+easier job than writing a proof test.
+
+Super is the generator, which is not the obvious choice. Measured on the same
+prompt asking for 45 snippets: Nano spends 26,000 characters reasoning before it
+writes anything and frequently exhausts its allowance first, producing nothing;
+Lightning returns a single usable line; Super does no reasoning at all on this
+task and answers directly in a third of the time. Task shape decides the model,
+not parameter count -- Super was the wrong choice for writing proof tests, where
+the work genuinely needed deliberation. A bad input costs one execution on each
 side and contributes nothing; a wrong assertion, by contrast, produces a false
 finding. Getting it right most of the time is not required — coverage is.
 """
@@ -10,7 +18,7 @@ from __future__ import annotations
 import ast
 import re
 
-from .models import NANO, NemotronClient
+from .models import SUPER, NemotronClient
 
 SYSTEM = """You produce Python call expressions that exercise a function across
 its interesting behaviour.
@@ -152,7 +160,7 @@ def generate(
     source: str,
     n: int = 40,
     hint: str = "",
-    model: str = NANO,
+    model: str = SUPER,
     max_tokens: int = 14000,
     subclasses: list[str] | None = None,
 ) -> list[str]:
@@ -211,7 +219,7 @@ def generate_validated(
     min_yield: float = 0.5,
     covering_tests: list[tuple[str, str]] | None = None,
     subclasses: list[str] | None = None,
-    model: str = NANO,
+    model: str = SUPER,
 ):
     """Generate inputs, run them against the unmodified code, and re-ask if too
     few survive.
