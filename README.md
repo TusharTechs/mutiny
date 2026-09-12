@@ -37,17 +37,8 @@ cp .env.example .env      # add NEBIUS_API_KEY
 .venv/bin/python scripts/doctor.py
 ```
 
-`doctor.py` verifies TLS, credentials and model availability, and prints spend
-to date. Run it first whenever something starts failing.
-
-### Behind a TLS-inspecting proxy
-
-Corporate middleboxes re-sign every connection with a certificate authority that
-only the machine's own trust store knows, which breaks Python, Node and uv while
-leaving `curl` working. `mutiny/tls.py` merges certifi's roots with the
-system keychain into `certs/ca-bundle.pem` and points every toolchain at it.
-It runs on `import mutiny`, rebuilds itself when missing or stale, and no-ops
-off macOS. Nothing to configure.
+`doctor.py` checks connectivity, credentials and model availability, and prints
+spend to date. Run it first if anything starts failing.
 
 ## Licence
 
