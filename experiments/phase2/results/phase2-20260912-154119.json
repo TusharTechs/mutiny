@@ -1,0 +1,815 @@
+[
+  {
+    "repo": "python-semver",
+    "sha": "0f18aa0b",
+    "subject": "Add optional native parser backend (minimal adapter) (#476",
+    "function": "Version.parse",
+    "applied": 4,
+    "malformed": 2,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 4,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 175.5,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 670,
+        "bug_class": "dropped_guard",
+        "mutation": "_native_parse_parts -> None",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "import semver\n\ndef test_parse_uses_fast_path_for_standard_version():\n    class TrackingVersion(semver.Version):\n        def __new__(cls, *args, **kwargs):\n            instance = super().__new__(cls)\n            instance._init_via_native = bool(args) and not kwargs\n            return instance\n        \n        def __init__(self, *args, **kwargs):\n            super().__init__(*args, **kwargs)\n    \n    version = TrackingVersion.parse(\"1.2.3\")\n    assert version._init_via_native\n",
+        "gate": [
+          "3+4 public interface, asserts on values: accesses private attribute '_init_via_native'; accesses private attribute '_init_via_native'"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "boundary_drift",
+        "mutation": "not optional_minor_and_patch -> optional_minor_and_patch",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "from semver import Version\n\n\ndef test_parse_version_with_prerelease_and_build():\n    version_str = \"1.2.3-alpha+build.1\"\n    v = Version.parse(version_str, True)\n    assert v.major == 1\n    assert v.minor == 2\n    assert v.patch == 3\n    assert v.prerelease == \"alpha\"\n    assert v.build == \"build.1\"\n",
+        "gate": [
+          "2 fails on mutant by assertion: verdicts=['passed']"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "numeric_type",
+        "mutation": "is not None -> is 0",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "import pytest\nfrom semver import Version\n\n\ndef test_parse_version_with_large_major_number():\n    \"\"\"\n    Test parsing a version with a major number exceeding 32-bit signed integer range.\n    This exercises the native backend's bounded integer handling and fallback to Python's\n    arbitrary-precision integers when the native backend is available.\n    \"\"\"\n    # 2^31 is 2147483648, which exceeds the maximum 32-bit signed integer (2^31 - 1)\n    # but fits within 64-bit and Python's arbitrary precision integers.\n    version_str = \"2147483648.0.0\"\n    version = Version.parse(version_str)\n    assert version.major == 2147483648\n    assert version.minor == 0\n    assert version.patch == 0\n    assert version.prerelease is None\n    assert version.build is None\n",
+        "gate": [
+          "2 fails on mutant by assertion: verdicts=['passed']"
+        ]
+      },
+      {
+        "line": 670,
+        "bug_class": "temporal",
+        "mutation": "optional_minor_and_patch -> optional_minor_and_patch_temporal",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_bump.py::test_should_bump_build[3.4.5-3.4.5+build.1]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+0009.dev-3.4.5-rc.1+0010.dev]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1+build.9-3.4.5-rc.1+build.10]",
+          "tests/test_bump.py::test_should_bump_build[3.4.5-rc.1-3.4.5-rc.1+build.1]"
+        ],
+        "test": "import pytest\nfrom semver import Version\n\n\ndef test_parse_accepts_major_only_with_optional_flag():\n    \"\"\"Version.parse handles major-only strings when optional parts are allowed.\"\"\"\n    version = Version.parse(\"3\", optional_minor_and_patch=True)\n    assert version.major == 3\n    assert version.minor == 0\n    assert version.patch == 0\n\n\ndef test_parse_accepts_major_minor_with_optional_flag():\n    \"\"\"Version.parse handles major.minor strings when optional parts are allowed.\"\"\"\n    version = Version.parse(\"3.4\", optional_minor_and_patch=True)\n    assert version.major == 3\n    assert version.minor == 4\n    assert version.patch == 0\n\n\ndef test_parse_rejects_incomplete_without_flag():\n    \"\"\"Version.parse rejects incomplete version strings by default.\"\"\"\n    with pytest.raises(ValueError):\n        Version.parse(\"3\")\n    with pytest.raises(ValueError):\n        Version.parse(\"3.4\")\n",
+        "gate": [
+          "3+4 public interface, asserts on values: embeds the original source span verbatim"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "fdec4ae1",
+    "subject": "fix(next_version): reset prerelease when token changes (#3",
+    "function": "Version.next_version",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 1,
+    "uncovered": 1,
+    "killed": 1,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.6,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "a8bb4f89",
+    "subject": "fix: replace deprecated semver.parse() with semver.Version",
+    "function": "Version.next_version",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "d8813b67",
+    "subject": "Fix #460 Improve bump_prerelease to alway get a newer vers",
+    "function": "Version.next_version",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 3,
+    "uncovered": 2,
+    "killed": 3,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.4,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "6208a548",
+    "subject": "Modernize project configs with uv & pyproject.toml",
+    "function": "find_version",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 3,
+    "uncovered": 3,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "0f301836",
+    "subject": "Improve private _nat_cmp() method",
+    "function": "Version.compare",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "9593ad08",
+    "subject": "Improve type hints to fix TODOs",
+    "function": "Version._nat_cmp",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 3,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 2.5,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "4b03f867",
+    "subject": "Fix #426: call subclass when deriving from Version",
+    "function": "Version.replace",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "655a7d06",
+    "subject": "Return dict instead of OrderedDict (#419)",
+    "function": "Version.to_dict",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "sha": "47b49cac",
+    "subject": "Fix #258: Keep semver._deprecated.compare",
+    "function": "compare",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 4,
+    "uncovered": 4,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "dd181c5a",
+    "subject": "Reject negative maxsize in Cache.__init__",
+    "function": "Cache.__init__",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 1,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "ccaa8c8c",
+    "subject": "Minor stylistic improvements.",
+    "function": "TLRUCache.__delitem",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 2,
+    "uncovered": 2,
+    "killed": 4,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.3,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "39b31bc9",
+    "subject": "Fix #405: Fix Cache.__setitem__ over-evicting when growing",
+    "function": "Cache.__setitem__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 4,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 59.6,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 82,
+        "bug_class": "dropped_guard",
+        "mutation": "if -> elif",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cache.py::CacheTest::test_clear",
+          "tests/test_cache.py::CacheTest::test_clear_getsizeof",
+          "tests/test_cache.py::CacheTest::test_delete",
+          "tests/test_cache.py::CacheTest::test_getsizeof_param"
+        ],
+        "test": "import pytest\nfrom cachetools import LRUCache\n\ndef test_update_existing_key_with_larger_value_triggers_eviction_and_respects_maxsize():\n    \"\"\"\n    When updating an existing key with a larger value, the cache must evict items\n    to stay within maxsize. If the key itself is evicted during this process,\n    the size accounting must adjust correctly so the final cache size does not\n    exceed maxsize.\n    \"\"\"\n    # Create an LRU cache with a small maxsize to force eviction.\n    cache = LRUCache(maxsize=100)\n\n    # Add three items, each of size 30. Total size = 90.\n    cache[\"a\"] = \"a\" * 30\n    cache[\"b\"] = \"b\" * 30\n    cache[\"c\"] = \"c\" * 30\n    assert cache.currsize == 90\n\n    # Update \"a\" with a larger value (size 50). The new total would be 90 - 30 + 50 = 110,\n    # which exceeds maxsize (100). The cache must evict items until it fits.\n    # Since \"a\" is the least recently used (access order: a, b, c), the eviction loop\n    # may remove \"a\" itself. The guard `if key not in self.__data` inside the eviction\n    # loop ensures that if \"a\" is evicted, the diffsize is corrected to the full size\n    # of the new value (50). Without this guard, the cache could end up with an\n    # incorrect current size.\n    cache[\"a\"] = \"a\" * 50\n\n    # After the update, the cache size must not exceed maxsize.\n    assert cache.currsize <= 100\n    # The updated key should be present with the new value.\n    assert cache[\"a\"] == \"a\" * 50\n",
+        "gate": [
+          "1 passes on HEAD: verdicts=['failed_assertion']; F                                                                        [100%]\n=========================== short test summary info ============================\nFAILED tests/test_mutiny_proof.py::test_update_existing_key_with_larger_value_triggers_eviction_and_respects_maxsize\n1 failed in 0.02s"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "13bb86a5",
+    "subject": "Minor style improvements to keep ruff happy.",
+    "function": "Cache.__init__",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.9,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "c0fdf6ab",
+    "subject": "Fix TLRUCache silently keeping stale value on expired over",
+    "function": "TLRUCache.__setitem__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 6,
+    "uncovered": 6,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "d5c7eea7",
+    "subject": "Reject negative cache item sizes",
+    "function": "Cache.__setitem__",
+    "applied": 4,
+    "malformed": 2,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 3,
+    "survivors": 1,
+    "proven": 1,
+    "attempts": [
+      3
+    ],
+    "empty_replies": 0,
+    "seconds": 35.2,
+    "blind_spots": [
+      {
+        "line": 79,
+        "bug_class": "numeric_type",
+        "mutation": "non-negative -> non_negative",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cache.py::CacheTest::test_getsizeof_negative",
+          "tests/test_fifo.py::FIFOCacheTest::test_getsizeof_negative",
+          "tests/test_lfu.py::LFUCacheTest::test_getsizeof_negative",
+          "tests/test_lru.py::LRUCacheTest::test_getsizeof_negative"
+        ],
+        "test": "from cachetools import FIFOCache\n\ndef test_cache_rejects_negative_size_with_well_formed_message():\n    class NegativeSizeCache(FIFOCache):\n        def getsizeof(self, value):\n            if value == \"negative\":\n                return -1\n            return 1\n\n    cache = NegativeSizeCache(maxsize=10)\n    try:\n        cache[\"key\"] = \"negative\"\n    except ValueError as e:\n        message = str(e).lower()\n        assert \"negative\" in message\n        assert \"size\" in message\n        assert \"_\" not in message\n    else:\n        assert False, \"Expected ValueError for negative size\"\n"
+      }
+    ],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "bd3fbc49",
+    "subject": "Improve typing support.",
+    "function": "_wrapper",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 6,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 143.5,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 414,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache -> wrapper.cach\u00e9",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "\"\"\"Test cache attribute accessibility on cachedmethod wrapper.\"\"\"\n\nfrom cachetools import cachedmethod\n\n\ndef test_cachedmethod_wrapper_has_cache_attribute():\n    \"\"\"Wrapper should expose the cache dict via .cache attribute.\"\"\"\n    cache = {}\n\n    class Example:\n        @cachedmethod(lambda self: cache)\n        def compute(self, value):\n            return value * 2\n\n    # Access the wrapper directly from the class\n    wrapper = Example.compute\n\n    # The wrapper must have a 'cache' attribute pointing to our cache\n    assert hasattr(wrapper, \"cache\")\n    assert wrapper.cache == cache\n",
+        "gate": [
+          "3+4 public interface, asserts on values: embeds the original source span verbatim"
+        ]
+      },
+      {
+        "line": 414,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache -> wrapper.cache_",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "from cachetools import cachedmethod\n\n\ndef test_cached_method_cache_attribute_reflects_actual_cache():\n    \"\"\"The .cache attribute on the decorated method must reference the live cache.\"\"\"\n    cache = {}\n\n    class Example:\n        @cachedmethod(lambda _: cache)\n        def compute(self, x):\n            return x * 2\n\n    # Get the decorated method from the class (public interface)\n    decorated = Example.compute\n\n    # The .cache attribute must exist and be the cache dict\n    method_cache = getattr(decorated, \"cache\", None)\n\n    # Assert it is exactly the cache we provided (by content)\n    assert method_cache == {}\n\n    # Verify it's the live cache by using it\n    obj = Example()\n    assert obj.compute(3) == 6\n    assert method_cache == {3: 6}\n\n    # Clear via the attribute\n    method_cache.clear()\n    assert method_cache == {}\n\n    # Next call repopulates\n    assert obj.compute(3) == 6\n    assert method_cache == {3: 6}\n",
+        "gate": [
+          "1 passes on HEAD: verdicts=['failed_assertion']; F                                                                        [100%]\n=========================== short test summary info ============================\nFAILED tests/test_mutiny_proof.py::test_cached_method_cache_attribute_reflects_actual_cache\n1 failed in 0.02s"
+        ]
+      },
+      {
+        "line": 415,
+        "bug_class": "identity_and_keys",
+        "mutation": "cache_key -> cache_",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "import warnings\nfrom cachetools import cachedmethod\n\n\ndef test_cached_method_exposes_cache_key_on_bound_method():\n    \"\"\"Bound decorated method should have a cache_key attribute holding the key callable.\"\"\"\n    cache = {}\n\n    class Example:\n        @cachedmethod(lambda self: self.cache)\n        def compute(self, x):\n            return x * 2\n\n    obj = Example()\n    obj.cache = cache\n\n    # Access the bound method through the instance\n    bound_method = obj.compute\n\n    # The bound method should expose the key function used for caching\n    assert hasattr(bound_method, \"cache_key\")\n    assert bound_method.cache_key is not None\n    assert callable(bound_method.cache_key)\n\n    # Verify the key function returns the cache when given the instance\n    returned_cache = bound_method.cache_key(obj)\n    assert returned_cache == cache\n\n    # Also verify basic caching still works\n    assert obj.compute(5) == 10\n    assert obj.compute(5) == 10\n    assert len(cache) == 1\n",
+        "gate": [
+          "1 passes on HEAD: verdicts=['failed_assertion']; F                                                                        [100%]\n=========================== short test summary info ============================\nFAILED tests/test_mutiny_proof.py::test_cached_method_exposes_cache_key_on_bound_method\n1 failed in 0.02s"
+        ]
+      },
+      {
+        "line": 416,
+        "bug_class": "argument_transposition",
+        "mutation": "lock if lock is not None else cond -> cond if lock is not None else lock",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "import threading\nfrom cachetools import cachedmethod\n\n\ndef test_cache_lock_attribute_is_provided_lock():\n    \"\"\"cache_lock on the decorated method should be the lock instance passed in.\"\"\"\n    lock = threading.Lock()\n    cache_storage = {}\n\n    def cache_factory(_):\n        return cache_storage\n\n    class Cached:\n        @cachedmethod(cache_factory, lock=lock)\n        def method(self, x):\n            return x\n\n    assert Cached.method.cache_lock is lock\n",
+        "gate": [
+          "3+4 public interface, asserts on values: compares object identity with `is` rather than value \u2014 identity is an implementation detail"
+        ]
+      },
+      {
+        "line": 416,
+        "bug_class": "argument_transposition",
+        "mutation": "else cond -> else lock",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "import threading\nfrom cachetools import cachedmethod\n\n\ndef test_cachedmethod_with_condition_caches_values():\n    \"\"\"Test that cachedmethod caches return values when only cond is provided.\"\"\"\n    cache = {}\n    condition = threading.Condition()\n    call_count = [0]\n\n    class MyClass:\n        @cachedmethod(lambda self: self.cache, cond=condition)\n        def compute(self, x):\n            call_count[0] += 1\n            return call_count[0] * 10 + x\n\n    obj = MyClass()\n    obj.cache = cache\n\n    try:\n        # First call with argument 5\n        result1 = obj.compute(5)\n        # Second call with same argument should return cached value\n        result2 = obj.compute(5)\n        # Call with different argument should compute new value\n        result3 = obj.compute(3)\n    except Exception as e:\n        result1 = e\n        result2 = e\n        result3 = e\n\n    # On correct implementation: caching works, call_count=2, results are 15, 15, 23\n    # On mutant: may raise exception or misbehave\n    assert result1 == 15\n    assert result2 == 15\n    assert result3 == 23\n    assert call_count[0] == 2\n",
+        "gate": [
+          "3+4 public interface, asserts on values: describes the mutation ('mutant') instead of the behaviour"
+        ]
+      },
+      {
+        "line": 417,
+        "bug_class": "identity_and_keys",
+        "mutation": "wrapper.cache_condition -> wrapper.cache_conditio",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_different_names",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_immutable_dict",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_no_set_name",
+          "tests/test_cachedmethod.py::CacheMethodTest::test_decorator_slots"
+        ],
+        "test": "import threading\nfrom cachetools import cachedmethod\n\n\ndef test_cache_condition_attribute_is_set():\n    \"\"\"Verify that the cache_condition attribute is correctly exposed on the decorated method.\"\"\"\n    cond = threading.Condition()\n    cache_dict = {}\n\n    class Example:\n        @cachedmethod(lambda self: cache_dict, cond=cond)\n        def compute(self, value):\n            return value * 2\n\n    # Access the descriptor from the class dict to avoid any descriptor protocol side-effects\n    descriptor = Example.__dict__[\"compute\"]\n    \n    # The descriptor should have the cache_condition attribute\n    assert hasattr(descriptor, \"cache_condition\")\n    assert descriptor.cache_condition == cond\n",
+        "gate": [
+          "1 passes on HEAD: verdicts=['errored']; F                                                                        [100%]\n=========================== short test summary info ============================\nFAILED tests/test_mutiny_proof.py::test_cache_condition_attribute_is_set - Ty...\n1 failed in 0.02s",
+          "2 fails on mutant by assertion: verdicts=['errored'], raised TypeError rather than AssertionError"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "af5e6881",
+    "subject": "Minor @cachedmethod performance improvements.",
+    "function": "_WrapperBase.cache_condition",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 2.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "98ec79ff",
+    "subject": "Drop \"class method\" from @cachedmethod docstring.",
+    "function": "cachedmethod",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 6,
+    "uncovered": 6,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.1,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "sha": "57d2e481",
+    "subject": "Fix #387: Handle obj=None case for inspection in _Descript",
+    "function": "_DescriptorBase.__get__",
+    "applied": 0,
+    "malformed": 6,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 0.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "b9d249f5",
+    "subject": "perf(tests): disable more unused pytest plugins (#1390)",
+    "function": "downstream",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "053c8846",
+    "subject": "tags: add interpreter_abi (#611)",
+    "function": "interpreter_abi",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 2,
+    "uncovered": 1,
+    "killed": 3,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 103.9,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 972,
+        "bug_class": "boundary_drift",
+        "mutation": "[:2] -> [:3]",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_tags.py::test_interpreter_abi"
+        ],
+        "test": "import sysconfig\nfrom collections import namedtuple\nimport pytest\nfrom packaging import tags\n\n\ndef test_interpreter_abi_uses_only_major_and_minor_version(monkeypatch: pytest.MonkeyPatch) -> None:\n    monkeypatch.setattr(tags, \"interpreter_name\", lambda: \"cp\")\n    monkeypatch.setattr(sysconfig, \"get_config_var\", {\"Py_DEBUG\": 0}.get)\n    # Use a version with non-zero micro to expose slice boundary drift\n    VersionInfo = namedtuple(\"version_info\", \"major minor micro releaselevel serial\")\n    version_info = VersionInfo(3, 11, 2, \"final\", 0)\n    monkeypatch.setattr(tags.sys, \"version_info\", version_info)\n    assert tags.interpreter_abi() == \"cp311\"\n",
+        "gate": [
+          "2 fails on mutant by assertion: verdicts=['passed']"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "55cbf1b9",
+    "subject": "fix(ranges): stop unbounded bounds sorting above each othe",
+    "function": "UpperBound.__init__",
+    "applied": 2,
+    "malformed": 4,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.5,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "4840c3a6",
+    "subject": "perf(tests): skip coverage on 3.13t (#1391)",
+    "function": "tests",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.6,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "f8630ea2",
+    "subject": "refactor(tags): make _generic_abi and _cpython_abis iterat",
+    "function": "generic_tags",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 1,
+    "proven": 1,
+    "attempts": [
+      2
+    ],
+    "empty_replies": 0,
+    "seconds": 15.6,
+    "blind_spots": [
+      {
+        "line": 556,
+        "bug_class": "dropped_guard",
+        "mutation": "list(abis) -> abis",
+        "attempts": 2,
+        "covering_tests": [
+          "tests/test_tags.py::TestGenericTags::test_abi_unspecified[abi0]",
+          "tests/test_tags.py::TestGenericTags::test_abi_unspecified[abi1]",
+          "tests/test_tags.py::TestGenericTags::test_abis_default",
+          "tests/test_tags.py::TestGenericTags::test_all_args"
+        ],
+        "test": "import pytest\nfrom packaging import tags\n\n\nclass TestGenericTags:\n    def test_abis_accepts_iterator(self) -> None:\n        def abi_iter():\n            yield \"abi1\"\n            yield \"abi2\"\n\n        try:\n            result = list(tags.generic_tags(\n                interpreter=\"testinterp34\",\n                abis=abi_iter(),\n                platforms=[\"plat1\", \"plat2\"],\n            ))\n        except AttributeError:\n            result = \"iterator_not_consumed\"\n\n        expected = [\n            tags.Tag(\"testinterp34\", \"abi1\", \"plat1\"),\n            tags.Tag(\"testinterp34\", \"abi1\", \"plat2\"),\n            tags.Tag(\"testinterp34\", \"abi2\", \"plat1\"),\n            tags.Tag(\"testinterp34\", \"abi2\", \"plat2\"),\n            tags.Tag(\"testinterp34\", \"none\", \"plat1\"),\n            tags.Tag(\"testinterp34\", \"none\", \"plat2\"),\n        ]\n        assert result == expected\n"
+      }
+    ],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "2945ea80",
+    "subject": "chore: support parallel nox (#1381)",
+    "function": "lint",
+    "applied": 5,
+    "malformed": 1,
+    "gate1_rejected": 5,
+    "uncovered": 5,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.4,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "c5675838",
+    "subject": "refactor(tags): use match statement for platform dispatch ",
+    "function": "platform_tags",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 3.6,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "4e79787a",
+    "subject": "fix(tags): preserve explicitly empty platform iterables (#",
+    "function": "compatible_tags",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 5,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 52.3,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 632,
+        "bug_class": "numeric_type",
+        "mutation": "list( -> tuple(",
+        "attempts": 3,
+        "covering_tests": [
+          "tests/test_tags.py::TestCompatibleTags::test_all_args",
+          "tests/test_tags.py::TestCompatibleTags::test_all_args_needs_underscore",
+          "tests/test_tags.py::TestCompatibleTags::test_default_interpreter",
+          "tests/test_tags.py::TestCompatibleTags::test_default_platforms"
+        ],
+        "test": "import pytest\nfrom packaging import tags\n\n\ndef test_compatible_tags_returns_exact_list() -> None:\n    \"\"\"\n    Test that compatible_tags returns the exact list of compatible tags.\n    This catches the mutation where list() is changed to tuple() in the return statement.\n    \"\"\"\n    python_version = (3, 11)\n    interpreter = \"cp311\"\n    platforms = (\"linux_x86_64\", \"macosx_10_15_x86_64\")\n\n    result = tags.compatible_tags(python_version, interpreter, platforms)\n\n    # The function returns a list of Tag objects. The mutant returns a tuple instead.\n    # We assert the exact list content to catch the tuple mutation.\n    expected = [\n        tags.Tag(\"cp311\", \"linux_x86_64\"),\n        tags.Tag(\"cp311\", \"macosx_10_15_x86_64\"),\n        tags.Tag(\"cp311\", \"any\"),\n        tags.Tag(\"cp311\", \"none\", \"any\"),\n        tags.Tag(\"cp311\", \"none\", \"any\"),\n        tags.Tag(\"cp310\", \"none\", \"any\"),\n        tags.Tag(\"cp39\", \"none\", \"any\"),\n        tags.Tag(\"cp38\", \"none\", \"any\"),\n        tags.Tag(\"cp37\", \"none\", \"any\"),\n        tags.Tag(\"cp36\", \"none\", \"any\"),\n        tags.Tag(\"cp35\", \"none\", \"any\"),\n        tags.Tag(\"cp34\", \"none\", \"any\"),\n        tags.Tag(\"cp33\", \"none\", \"any\"),\n        tags.Tag(\"cp32\", \"none\", \"any\"),\n        tags.Tag(\"cp31\", \"none\", \"any\"),\n        tags.Tag(\"cp30\", \"none\", \"any\"),\n        tags.Tag(\"py311\", \"none\", \"any\"),\n        tags.Tag(\"py310\", \"none\", \"any\"),\n        tags.Tag(\"py39\", \"none\", \"any\"),\n        tags.Tag(\"py38\", \"none\", \"any\"),\n        tags.Tag(\"py37\", \"none\", \"any\"),\n        tags.Tag(\"py36\", \"none\", \"any\"),\n        tags.Tag(\"py35\", \"none\", \"any\"),\n        tags.Tag(\"py34\", \"none\", \"any\"),\n        tags.Tag(\"py33\", \"none\", \"any\"),\n        tags.Tag(\"py32\", \"none\", \"any\"),\n        tags.Tag(\"py31\", \"none\", \"any\"),\n        tags.Tag(\"py30\", \"none\", \"any\"),\n        tags.Tag(\"py3\", \"none\", \"any\"),\n        tags.Tag(\"py3\", \"none\", \"any\"),\n    ]\n    assert result == expected\n",
+        "gate": [
+          "3+4 public interface, asserts on values: describes the mutation ('mutant') instead of the behaviour"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "b0974504",
+    "subject": "feat: drop support for EOL Python 3.9 (#1354)",
+    "function": "Version.__init__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 10.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "2d873eb6",
+    "subject": "fix(metadata): fold every line boundary when writing heade",
+    "function": "_Validator._process_summary",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 1.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  }
+]
