@@ -73,6 +73,21 @@ def source_at(repo: Path, ref: str, path: str) -> str:
                           capture_output=True, text=True, check=True).stdout
 
 
+def module_for(path: str) -> str:
+    """Import name for a source file: src/packaging/_ranges.py -> packaging._ranges.
+
+    Using the top-level package instead is silent and total: every expression
+    raises NameError because the symbols live in a submodule, and the run reports
+    zero usable inputs rather than an error. It cost all eight packaging cases.
+    """
+    parts = list(Path(path).with_suffix("").parts)
+    if parts and parts[0] in {"src", "lib"}:
+        parts = parts[1:]
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
 def suite_for(repo: Path, path: str) -> str:
     stem = Path(path).stem.lstrip("_")
     for c in (f"tests/test_{stem}.py", f"tests/{stem}_test.py"):
@@ -125,6 +140,7 @@ def discover(repo: Path, limit: int) -> list[dict]:
 
 def one_run(client, repo, module, case, python_exe) -> dict:
     sha, path, fn = case["sha"], case["path"], case["fn"]
+    module = module_for(path) or module
     before_src = focused_module(source_at(repo, f"{sha}^", path), fn)
     subclasses = receiver_candidates(source_at(repo, f"{sha}^", path), fn)
 
