@@ -16,6 +16,7 @@ single instrumented run of the suite.
 from __future__ import annotations
 
 import ast
+import json
 import os
 import subprocess
 import sys
@@ -47,15 +48,37 @@ def _strip_context(context: str) -> str:
     return context.split("|", 1)[0].strip()
 
 
+def _cache_path(repo: Path, selector: str, package: str) -> Path | None:
+    """Coverage for a given commit never changes, so measuring it twice is waste."""
+    import hashlib
+    import subprocess as sp
+
+    head = sp.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                  capture_output=True, text=True).stdout.strip()
+    if not head:
+        return None
+    key = hashlib.sha256(f"{head}|{selector}|{package}".encode()).hexdigest()[:24]
+    return Path(__file__).resolve().parent.parent / ".cache" / "coverage" / f"{key}.json"
+
+
 def measure(
     repo: Path,
     selector: str,
     package: str,
     python_exe: str | None = None,
     timeout: int = 1800,
+    use_cache: bool = True,
 ) -> CoverageMap:
     """Run the suite once with per-test contexts and map every line to its tests."""
     python_exe = python_exe or sys.executable
+
+    cache = _cache_path(repo, selector, package) if use_cache else None
+    if cache and cache.is_file():
+        raw = json.loads(cache.read_text())
+        return CoverageMap(
+            by_line={(p, int(ln)): tuple(t) for p, ln, t in raw["by_line"]},
+            measured=raw["measured"], note=raw.get("note", ""),
+        )
 
     with tempfile.TemporaryDirectory(prefix="mutiny-cov-") as tmp:
         data_file = Path(tmp) / "cov.sqlite"
@@ -97,7 +120,14 @@ def measure(
                 if tests:
                     by_line[(rel, lineno)] = tests
 
-    return CoverageMap(by_line=by_line, measured=True)
+    result = CoverageMap(by_line=by_line, measured=True)
+    if cache:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({
+            "measured": True,
+            "by_line": [[p, ln, list(t)] for (p, ln), t in by_line.items()],
+        }))
+    return result
 
 
 def test_source(repo: Path, test_id: str) -> str | None:

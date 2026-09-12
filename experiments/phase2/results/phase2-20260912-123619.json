@@ -646,5 +646,171 @@
     "blind_spots": [],
     "unproven": [],
     "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "4840c3a6",
+    "subject": "perf(tests): skip coverage on 3.13t (#1391)",
+    "function": "tests",
+    "applied": 0,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 475.2,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "f8630ea2",
+    "subject": "refactor(tags): make _generic_abi and _cpython_abis iterat",
+    "function": "generic_tags",
+    "applied": 1,
+    "malformed": 5,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 0,
+    "survivors": 1,
+    "proven": 1,
+    "attempts": [
+      1
+    ],
+    "empty_replies": 0,
+    "seconds": 48.7,
+    "blind_spots": [
+      {
+        "line": 556,
+        "bug_class": "dropped_guard",
+        "mutation": "list(abis) -> abis",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_tags.py::TestGenericTags::test_abi_unspecified[abi0]",
+          "tests/test_tags.py::TestGenericTags::test_abi_unspecified[abi1]",
+          "tests/test_tags.py::TestGenericTags::test_abis_default",
+          "tests/test_tags.py::TestGenericTags::test_all_args"
+        ],
+        "test": "import packaging.tags as tags\n\ndef test_generic_tags_does_not_mutate_abis_argument():\n    abis = [\"cp310\"]\n    platforms = [\"any\"]\n    list(tags.generic_tags(interpreter=\"test\", abis=abis, platforms=platforms))\n    assert abis == [\"cp310\"]\n"
+      }
+    ],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "2945ea80",
+    "subject": "chore: support parallel nox (#1381)",
+    "function": "lint",
+    "applied": 5,
+    "malformed": 1,
+    "gate1_rejected": 5,
+    "uncovered": 5,
+    "killed": 0,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 195.5,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "c5675838",
+    "subject": "refactor(tags): use match statement for platform dispatch ",
+    "function": "platform_tags",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 84.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "4e79787a",
+    "subject": "fix(tags): preserve explicitly empty platform iterables (#",
+    "function": "compatible_tags",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 5,
+    "survivors": 1,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 1,
+    "seconds": 37.5,
+    "blind_spots": [],
+    "unproven": [
+      {
+        "line": 632,
+        "bug_class": "numeric_type",
+        "mutation": "list( -> tuple(",
+        "attempts": 1,
+        "covering_tests": [
+          "tests/test_tags.py::TestCompatibleTags::test_all_args",
+          "tests/test_tags.py::TestCompatibleTags::test_all_args_needs_underscore",
+          "tests/test_tags.py::TestCompatibleTags::test_default_interpreter",
+          "tests/test_tags.py::TestCompatibleTags::test_default_platforms"
+        ],
+        "test": "",
+        "gate": [
+          "0 model returned no content: truncated at 3000 tokens with empty content and empty reasoning \u2014 the prompt is too large, not the allowance too small"
+        ]
+      }
+    ],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "b0974504",
+    "subject": "feat: drop support for EOL Python 3.9 (#1354)",
+    "function": "Version.__init__",
+    "applied": 6,
+    "malformed": 0,
+    "gate1_rejected": 0,
+    "uncovered": 0,
+    "killed": 6,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 162.3,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
+  },
+  {
+    "repo": "packaging",
+    "sha": "2d873eb6",
+    "subject": "fix(metadata): fold every line boundary when writing heade",
+    "function": "_Validator._process_summary",
+    "applied": 3,
+    "malformed": 3,
+    "gate1_rejected": 1,
+    "uncovered": 0,
+    "killed": 2,
+    "survivors": 0,
+    "proven": 0,
+    "attempts": [],
+    "empty_replies": 0,
+    "seconds": 125.7,
+    "blind_spots": [],
+    "unproven": [],
+    "error": ""
   }
 ]
