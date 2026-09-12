@@ -128,7 +128,24 @@ def observe(
                 f"driver produced nothing: {(proc.stdout + proc.stderr).strip()[-300:]}"
             )
         raw = json.loads(out.read_text())
-    return [Observation(r["input"], r["ok"], r.get("value"), r.get("error")) for r in raw]
+    observations = [
+        Observation(r["input"], r["ok"], r.get("value"), r.get("error")) for r in raw
+    ]
+
+    # Every expression failing on an undefined name means we are looking in the
+    # wrong module, not that the inputs were bad. Reported as zero usable inputs
+    # this is indistinguishable from a hard problem, and it silently cost ten of
+    # nineteen cases in one run. Fail loudly instead.
+    if observations and all(not o.ok for o in observations):
+        kinds = {(o.error or "").split(":", 1)[0] for o in observations}
+        if kinds <= {"NameError", "AttributeError", "ImportError", "ModuleNotFoundError"}:
+            raise LookupError(
+                f"every expression failed with {'/'.join(sorted(kinds))} in module "
+                f"{module!r} — the symbols are probably defined in a submodule. "
+                f"First: {observations[0].input!r} -> {observations[0].error}"
+            )
+
+    return observations
 
 
 def compare(before: list[Observation], after: list[Observation]) -> list[Divergence]:

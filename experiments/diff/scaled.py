@@ -157,7 +157,8 @@ def one_run(client, repo, module, case, python_exe) -> dict:
             probe=lambda e: observe(repo, module, e, python_exe),
             n=N_INPUTS, covering_tests=examples, subclasses=subclasses)
         if not exprs:
-            return {"inputs": 0, "usable": 0, "diverged": 0, "witnesses": []}
+            return {"inputs": 0, "usable": 0, "diverged": 0, "witnesses": [],
+                    "error": "generator produced no parseable inputs"}
         before = observe(repo, module, exprs, python_exe)
     with at(repo, sha):
         after = observe(repo, module, exprs, python_exe)
@@ -203,9 +204,11 @@ def main() -> int:
                 res = {"inputs": 0, "usable": 0, "diverged": 0, "witnesses": [],
                        "error": traceback.format_exc().strip().splitlines()[-1][:140]}
             runs.append(res)
+            note = f"  [{res['error']}]" if res.get("error") else ""
+            if not note and res["inputs"] and not res["usable"]:
+                note = "  [inputs generated but none ran — investigate]"
             print(f"  run {r+1}: {res['usable']}/{res['inputs']} usable, "
-                  f"{res['diverged']} divergent"
-                  + (f"  [{res['error']}]" if res.get("error") else ""), flush=True)
+                  f"{res['diverged']} divergent{note}", flush=True)
             for w in res["witnesses"][:1]:
                 print("    " + w.replace("\n", "\n  "), flush=True)
         records.append({**case, "repo": repo_name, "runs": runs})
@@ -222,6 +225,8 @@ def main() -> int:
         kind = "CHANGES" if rec["expect"] else "preserves"
         print(f"{rec['repo']:<14}{rec['sha'][:8]:<10}{kind:<11}"
               f"{str(d):<16}{', '.join(u):>9}")
+        if all(r["inputs"] == 0 for r in rec["runs"]):
+            continue  # nothing was measured; counting it as a miss is dishonest
         agg["detected" if rec["expect"] else "quiet"].append(any(x > 0 for x in d))
         agg["stability"].append(len(set(d)) == 1)
     print("-" * 78)
@@ -233,6 +238,10 @@ def main() -> int:
         flagged = sum(refactors)
         print(f"  preserving commits flagged:   {flagged}/{len(refactors)}"
               f"   (inspect — a flagged refactor may be a real bug, not a false alarm)")
+    blanks = sum(1 for rec in records if all(r["inputs"] == 0 for r in rec["runs"]))
+    if blanks:
+        print(f"  cases yielding no inputs at all: {blanks}/{len(records)} "
+              f"— these measure nothing and are excluded from the rates above")
     if agg["stability"]:
         print(f"  runs agreeing across repeats: {sum(agg['stability'])}/"
               f"{len(agg['stability'])} = {100*sum(agg['stability'])/len(agg['stability']):.0f}%")
