@@ -178,3 +178,78 @@ and no content, with `finish_reason == "length"` and no error. This had already
 been diagnosed, written up, and fixed in `proof.py` — and not applied to
 `attacks.py`. The remedy now lives in `NemotronClient.complete()` where no caller
 can forget it. Fix the layer, not the call site.
+
+---
+
+# Phase 1b — diff-scoped, 12 September 2026
+
+Six real commits, mutations restricted to the lines each change touched.
+
+| | Phase 1 (mature internals) | Phase 1b (changed lines) |
+|---|---|---|
+| mutations applied | 30 | 17 |
+| killed | 27 | 14 |
+| survivors | 3 (10%) | 3 (18%) |
+| proven | 1 | **0** |
+
+Combined: **1 of 6 survivors proven.** That is below the 40% line I said would
+mean reconsidering the product, so it deserves a real diagnosis rather than a
+shrug about sample size.
+
+## The diagnosis: the model cannot see how to reach the code it must attack
+
+Reading the three failed proof tests settles it. They are not incompetent — they
+are well-formed tests of the wrong thing.
+
+For `packaging`, where the mutation was `[:2]` to `[:3]` inside
+`interpreter_abi`, Nemotron wrote a test for `pure_python_tags()` and asserted on
+`py{major}{minor}`. Sensible code, adjacent function, completely unaffected by
+the mutation. It failed rule 2 because it passes on both versions.
+
+For `cachetools`, given an argument-transposition mutation, it wrote a test
+passing those arguments *by keyword* — where order cannot matter. Again: passes
+on both.
+
+The pattern is the same every time. The mutated code is internal
+(`_cmpkey`, `interpreter_abi`, `Cache.__setitem__`), the model is given the
+module source and the mutation but no indication of how a caller actually
+reaches that line, so it guesses at the public surface and guesses adjacent.
+
+## Two concrete causes, one remedy
+
+**The test file we show as context is chosen by size.** `run_prscoped.py` picks
+the largest `test_*.py` in the repo, which for `packaging` is emphatically not
+`test_tags.py`. The model's only worked examples are of unrelated code.
+
+**Nothing tells the model which tests already execute the mutated line.** That
+information exists — it is coverage — and it answers exactly the question the
+model is failing to answer.
+
+Both are fixed by the same mechanism. Run the existing suite under coverage,
+identify the tests that execute the mutated line, and put *those* tests in the
+prompt: "these existing tests already reach this line and none of them detect
+the change; write one that does." That converts the hardest inference in the
+task into given information.
+
+## Coverage also fixes a claim we have been making loosely
+
+A mutation on a line no test executes is not a blind spot. It is uncovered code,
+which `coverage.py` already reports for free and which nobody needs an LLM to
+find. The interesting finding — the one the product exists for — is a line that
+*is* covered and still unconstrained.
+
+We have not been separating those, which means some of what we would have
+reported as blind spots was ordinary missing coverage dressed up. Gate 1 should
+require that the mutated line be covered by at least one existing test, and the
+report should say so.
+
+## Honest status
+
+The number is bad and the sample is small, and both are true at once. What keeps
+this from being a verdict on the product is that the failures are specific and
+mechanical rather than diffuse: in every case the model wrote a reasonable test
+of code that the mutation does not touch, for a reason we can name and fix.
+
+The next run decides it. With covering tests in the prompt, if the rate does not
+move well above 40%, the problem is not instrumentation and the design needs
+rethinking rather than tuning.
