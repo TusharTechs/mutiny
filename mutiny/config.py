@@ -61,7 +61,12 @@ def ca_bundle() -> str | None:
 
 
 def apply_tls_trust() -> None:
-    """Deprecated alias — mutiny.tls.apply() runs automatically on import."""
+    """Install the merged CA bundle eagerly.
+
+    Only needed by entry points that want trust configured before the first
+    request — doctor.py, for instance. Normal code paths repair reactively
+    instead; see mutiny.tls.repair.
+    """
     from .tls import apply
 
     apply()

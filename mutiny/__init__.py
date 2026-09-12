@@ -1,8 +1,7 @@
 """MUTINY — adversarial verification for AI-written code."""
-from . import tls as _tls
-
-# Corporate TLS inspection breaks every outbound call from Python, Node and uv.
-# Fixing it at import time means no module, script or subprocess has to remember.
-_tls.apply()
 
 __version__ = "0.1.0"
+
+# Importing this package deliberately has no side effects. TLS trust is repaired
+# reactively when a request is actually rejected (see mutiny.tls.repair), so a
+# machine that does not sit behind an inspecting proxy is left alone.

@@ -8,8 +8,15 @@ every outbound call.
 
 The fix is one merged bundle — certifi's public roots plus whatever the admin
 installed locally — exported to a file and pointed at via the environment
-variables each toolchain reads. ``apply()`` runs on ``import mutiny``, builds the
-bundle if it is missing or stale, and is safe to call repeatedly.
+variables each toolchain reads.
+
+Nothing here runs on import. Rewriting a process's trust configuration as a side
+effect of importing a library is invasive, and on a machine that never needed it
+we would be replacing a working system trust store with one we assembled. So the
+repair is reactive: call ``repair(exc)`` when a request actually fails
+verification, and it builds the bundle, exports it, and reports whether a retry
+is worth attempting. Entry points that want it eagerly can still call ``apply()``
+directly.
 
 Deliberately *not* hardcoding the proxy's CA names: they differ per vendor and
 get rotated. Everything in the system keychain is admin-installed by definition,
@@ -19,6 +26,7 @@ from __future__ import annotations
 
 import os
 import platform
+import ssl
 import shutil
 import subprocess
 import time
@@ -133,3 +141,67 @@ def check(url: str = "https://api.tokenfactory.us-central1.nebius.com/v1/models"
         return True, f"TLS ok (HTTP {exc.code})"
     except Exception as exc:  # noqa: BLE001 - report whatever went wrong
         return False, f"{type(exc).__name__}: {exc}"
+
+
+# ------------------------------------------------------------------- reactive
+
+_REPAIRED = False
+
+# Two distinct failures, one remedy. The chain is rejected because the issuer is
+# missing, or the configured bundle cannot be read at all — a corrupt or empty
+# SSL_CERT_FILE fails when the SSL context is built, before any request is made.
+_VERIFY_MARKERS = (
+    "CERTIFICATE_VERIFY_FAILED",
+    "certificate verify failed",
+    "unable to get local issuer certificate",
+    "unable to get issuer certificate",
+    "self-signed certificate",
+    "self signed certificate",
+    "PEM lib",
+    "no certificate or crl found",
+)
+
+
+def is_verification_error(exc: BaseException) -> bool:
+    """Is this failure — anywhere in its cause chain — a certificate rejection?
+
+    The chain matters: an SSLCertVerificationError surfaces as an
+    openai.APIConnectionError wrapping an httpx.ConnectError wrapping the real
+    thing, and only the innermost exception says what actually went wrong.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ssl.SSLCertVerificationError):
+            return True
+        text = str(current)
+        if any(marker in text for marker in _VERIFY_MARKERS):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def repair(exc: BaseException) -> bool:
+    """If `exc` is a certificate rejection, install the merged bundle.
+
+    Returns True when something changed and the caller should retry. Repairs at
+    most once per process: a second failure after the bundle is in place is a
+    real problem, not a trust-store gap, and retrying would only hide it.
+    """
+    global _REPAIRED
+    if _REPAIRED or not is_verification_error(exc):
+        return False
+    bundle = apply(force_rebuild=True)
+    _REPAIRED = True
+    if bundle is None:
+        return False
+    import sys
+
+    print(
+        f"mutiny: certificate verification failed, which usually means a "
+        f"TLS-inspecting proxy. Rebuilt {bundle} with {count()} certificates "
+        f"and retrying.",
+        file=sys.stderr,
+    )
+    return True

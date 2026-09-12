@@ -24,7 +24,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .config import apply_tls_trust, nebius_api_key, nebius_base_url
+from . import tls
+from .config import nebius_api_key, nebius_base_url
 
 NANO = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 SUPER = "nvidia/nemotron-3-super-120b-a12b"
@@ -122,7 +123,6 @@ class NemotronClient:
         cache_dir: Path | None = None,
         ledger_path: Path | None = None,
     ) -> None:
-        apply_tls_trust()
         root = Path(__file__).resolve().parent.parent
         self.cache_dir = cache_dir or root / ".cache" / "completions"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -138,6 +138,21 @@ class NemotronClient:
 
             self._client = OpenAI(api_key=nebius_api_key(), base_url=nebius_base_url())
         return self._client
+
+    def _with_tls_repair(self, call: Any) -> Any:
+        """Run `call`; if the certificate chain is rejected, fix trust and retry.
+
+        The client is discarded before retrying because httpx resolves its SSL
+        context when it is constructed — repairing the environment does nothing
+        for a connection pool that was already built.
+        """
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 - re-raised unless we can repair
+            if not tls.repair(exc):
+                raise
+            self._client = None
+            return call()
 
     def _key(self, payload: dict[str, Any]) -> str:
         blob = json.dumps(payload, sort_keys=True, default=str).encode()
@@ -190,7 +205,7 @@ class NemotronClient:
             kwargs["response_format"] = response_format
 
         started = time.monotonic()
-        resp = self.client.chat.completions.create(**kwargs)
+        resp = self._with_tls_repair(lambda: self.client.chat.completions.create(**kwargs))
         elapsed = time.monotonic() - started
 
         choice = resp.choices[0]

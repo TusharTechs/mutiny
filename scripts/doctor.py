@@ -11,8 +11,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mutiny  # noqa: F401  - importing applies the TLS trust fix
 from mutiny import tls
+
+# The doctor's job is to verify trust before anything else runs, so unlike normal
+# code paths it installs the bundle eagerly rather than waiting for a failure.
+tls.apply()
 from mutiny.config import have_nebius, nebius_base_url, tavily_api_key
 
 OK, BAD = "  ok  ", " FAIL "
