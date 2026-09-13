@@ -1,322 +1,201 @@
-"""`mutiny verify` — did that rewrite preserve behaviour?
+"""`mutiny` — did that change preserve behaviour?
 
-One command: Nemotron rewrites a function, both versions run on the same
-generated inputs inside forks of a single warm Sandboxes checkpoint, and the
-answer is either the exact input where they disagree or a clean bill.
+Two commands over one engine:
 
-The two versions share one checkpoint. The rewritten file is laid over the top
-inside its own fork, so nothing expensive is built twice and neither side can
-see the other.
+    mutiny verify <repo> <function>        rewrite it with Nemotron, then check
+    mutiny verify-diff <repo> --base ...   check a change you already have
+
+Both render the event stream from `mutiny.session`, which the web interface
+renders too. The loop lives there; this file only decides how it looks in a
+terminal.
 """
 from __future__ import annotations
 
 import argparse
-import difflib
 import sys
-import time
 from pathlib import Path
 
-from . import refactor as refactor_mod
-from . import review as review_mod
-from .differential import compare, confirm
-from .differential import observe as local_observe
-from .inputs import generate_validated, is_stateful, receiver_candidates
-from .models import NemotronClient
-from .sandbox import SandboxExecutor, available, file_at, tarball_at
-from .source import focused_module, function_span
+from .session import verify_diff as run_diff
+from .session import verify_function as run_function
 
-BOLD, DIM, RED, GREEN, YELLOW, RESET = (
-    "\033[1m", "\033[2m", "\033[31m", "\033[32m", "\033[33m", "\033[0m")
-
-SKIP = {".git", ".venv", "venv", "__pycache__", "build", "dist", "node_modules"}
+BOLD, DIM, RED, GREEN, YELLOW, CYAN, RESET = (
+    "\033[1m", "\033[2m", "\033[31m", "\033[32m", "\033[33m", "\033[36m", "\033[0m")
 
 
-def _palette(enabled: bool) -> tuple[str, ...]:
-    return (BOLD, DIM, RED, GREEN, YELLOW, RESET) if enabled else ("",) * 6
+def _wrap(text: str, width: int) -> list[str]:
+    lines, current = [], ""
+    for word in text.split():
+        if current and len(current) + len(word) + 1 > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+    return lines
 
 
-def locate(repo: Path, qualname: str) -> tuple[Path, str] | None:
-    """Find the file defining `qualname`, and the name it is imported under."""
-    for path in sorted(repo.rglob("*.py")):
-        rel = path.relative_to(repo)
-        if SKIP & set(rel.parts) or "tests" in rel.parts or rel.name.startswith("test_"):
-            continue
-        try:
-            function_span(path.read_text(encoding="utf-8"), qualname)
-        except (ValueError, SyntaxError, UnicodeDecodeError, OSError):
-            continue
-        parts = list(rel.with_suffix("").parts)
-        if parts and parts[0] in {"src", "lib"}:
-            parts = parts[1:]
-        if parts and parts[-1] == "__init__":
-            parts = parts[:-1]
-        return path, ".".join(parts)
-    return None
+class Render:
+    """Turns the event stream into something readable in a terminal."""
+
+    def __init__(self, colour: bool, show: int, interactive: bool = True):
+        keys = ("bold", "dim", "red", "green", "yellow", "cyan", "reset")
+        values = (BOLD, DIM, RED, GREEN, YELLOW, CYAN, RESET) if colour else ("",) * 7
+        self.c = dict(zip(keys, values))
+        self.show = show
+        # Carriage returns overwrite in a terminal and smear everywhere else —
+        # piped into a file or a CI log every intermediate state is kept.
+        self.interactive = interactive
+        self.forks: dict[str, dict[int, str]] = {}
+        self.findings = 0
+
+    def __call__(self, event: dict) -> None:
+        handler = getattr(self, f"_{event['type']}", None)
+        if handler is not None:
+            handler(event)
+
+    def _target(self, e: dict) -> None:
+        c = self.c
+        print(f"{c['bold']}{e['repo']}{c['reset']}  {e['path']}  "
+              f"{c['bold']}{e['function']}{c['reset']}  "
+              f"{c['dim']}({e['module']}){c['reset']}\n")
+
+    def _review(self, e: dict) -> None:
+        c = self.c
+        print(f"{c['bold']}{e['repo']}{c['reset']}  {e['base']}..{e['head']}")
+        if not e["targets"]:
+            print(f"\n{c['yellow']}nothing to verify — no changed lines sit inside "
+                  f"a function we can probe{c['reset']}")
+            for skip in e["skipped"][:5]:
+                print(f"  {c['dim']}{skip['path']}: {skip['why']}{c['reset']}")
+            return
+        extra = f", {len(e['skipped'])} skipped" if e["skipped"] else ""
+        print(f"{c['dim']}{len(e['targets'])} changed function(s) to check{extra}"
+              f"{c['reset']}\n")
+
+    def _status(self, e: dict) -> None:
+        print(f"{self.c['dim']}{e['text']}...{self.c['reset']}")
+
+    def _checkpoint(self, e: dict) -> None:
+        c = self.c
+        print(f"{c['dim']}  ready in {e['seconds']}s, {e['kib']} KiB, "
+              f"{e['mode']}{c['reset']}")
+
+    def _diff(self, e: dict) -> None:
+        c = self.c
+        for line in e["lines"]:
+            colour = (c["green"] if line.startswith("+")
+                      else c["red"] if line.startswith("-") else c["dim"])
+            print(f"    {colour}{line}{c['reset']}")
+
+    def _probes(self, e: dict) -> None:
+        print(f"{self.c['dim']}  {e['count']} probes{self.c['reset']}")
+
+    def _no_probes(self, e: dict) -> None:
+        print(f"  {self.c['yellow']}no usable probes{self.c['reset']}\n")
+
+    def _function(self, e: dict) -> None:
+        c = self.c
+        print(f"{c['bold']}{e['name']}{c['reset']}  {c['dim']}{e['path']}{c['reset']}")
+
+    def _fork(self, e: dict) -> None:
+        side = self.forks.setdefault(e["side"], {})
+        side[e["index"]] = e["state"]
+        if e["state"] == "running" and len(side) < e["total"]:
+            return
+        glyphs = "".join(
+            {"running": "·", "done": "•", "failed": "x"}.get(
+                side.get(i, "running"), "·")
+            for i in range(e["total"]))
+        done = sum(1 for s in side.values() if s == "done")
+        if not self.interactive and done != e["total"]:
+            return
+        end = "\n" if done == e["total"] else "\r"
+        print(f"  {self.c['dim']}{e['side']:<6}{self.c['reset']} "
+              f"{self.c['cyan']}{glyphs}{self.c['reset']} "
+              f"{self.c['dim']}{done}/{e['total']} forks{self.c['reset']}",
+              end=end, flush=True)
+        if done == e["total"]:
+            self.forks[e["side"]] = {}
+
+    def _flaky(self, e: dict) -> None:
+        print(f"  {self.c['dim']}{e['count']} probe(s) disagreed once but not on "
+              f"repeat — discarded as nondeterministic{self.c['reset']}")
+
+    def _result(self, e: dict) -> None:
+        c = self.c
+        if not e["divergences"]:
+            print(f"  {c['green']}preserved{c['reset']} {c['dim']}— {e['agreed']}/"
+                  f"{e['probes']} probes ran on both versions and agreed{c['reset']}\n")
+            return
+        self.findings += 1
+        print(f"  {c['red']}{c['bold']}behaviour changed{c['reset']} — "
+              f"{len(e['divergences'])} of {e['probes']} probes disagree\n")
+        if e.get("summary"):
+            for line in _wrap(e["summary"], 76):
+                print(f"    {c['bold']}{line}{c['reset']}")
+            print()
+        for d in e["divergences"][: self.show]:
+            print(f"    {c['dim']}{d['input']}{c['reset']}")
+            print(f"      before  {c['green']}{d['before']}{c['reset']}")
+            print(f"      after   {c['red']}{d['after']}{c['reset']}")
+            if d["kind"] == "message":
+                print(f"      {c['dim']}(only the error wording differs){c['reset']}")
+        remaining = len(e["divergences"]) - self.show
+        if remaining > 0:
+            print(f"    {c['dim']}...and {remaining} more{c['reset']}")
+        print()
+
+    def _verdict(self, e: dict) -> None:
+        c = self.c
+        if e["functions"] and e["findings"]:
+            print(f"{c['red']}{c['bold']}{e['findings']} of {e['functions']} changed "
+                  f"function(s) behave differently.{c['reset']}")
+        elif e["functions"]:
+            print(f"{c['green']}{c['bold']}No behaviour change detected{c['reset']} "
+                  f"across {e['functions']} function(s).")
+        print(f"{c['dim']}{e['seconds']}s, ${e['cost']:.4f}{c['reset']}")
+
+    def _error(self, e: dict) -> None:
+        print(f"{self.c['red']}{e['message']}{self.c['reset']}", file=sys.stderr)
 
 
-def _as_applied(patched: str, qualname: str) -> str | None:
-    """The rewritten function exactly as it now sits in the file."""
-    try:
-        lo, hi = function_span(patched, qualname)
-    except (ValueError, SyntaxError):
-        return None
-    return "\n".join(patched.splitlines()[lo - 1 : hi])
-
-
-def show_diff(before: str, after: str, dim: str, red: str, green: str, reset: str) -> None:
-    for line in difflib.unified_diff(
-        before.splitlines(), after.splitlines(),
-        fromfile="original", tofile="rewritten", lineterm="", n=2,
-    ):
-        if line.startswith(("+++", "---")):
-            continue
-        colour = green if line.startswith("+") else red if line.startswith("-") else dim
-        print(f"    {colour}{line}{reset}")
+def _render(events, colour: bool, show: int) -> int:
+    render = Render(colour, show, interactive=sys.stdout.isatty())
+    failed = False
+    for event in events:
+        render(event)
+        failed |= event["type"] == "error"
+    return 2 if failed else (1 if render.findings else 0)
 
 
 def verify(args: argparse.Namespace) -> int:
-    bold, dim, red, green, yellow, reset = _palette(
-        not args.no_color and sys.stdout.isatty())
     repo = Path(args.repo).expanduser().resolve()
     if not repo.is_dir():
-        print(f"{red}no such repository: {repo}{reset}", file=sys.stderr)
+        print(f"no such repository: {repo}", file=sys.stderr)
         return 2
-
-    found = locate(repo, args.function)
-    if found is None:
-        print(f"{red}could not find {args.function!r} in {repo.name} — qualify it "
-              f"as Class.method if the name repeats{reset}", file=sys.stderr)
-        return 2
-    path, module = found
-    rel = str(path.relative_to(repo))
-    print(f"{bold}{repo.name}{reset}  {rel}  {bold}{args.function}{reset}"
-          f"  {dim}({module}){reset}\n")
-
-    client = NemotronClient(cap_usd=args.cap)
-    opening_spend = client.ledger.total_usd
-    source = path.read_text(encoding="utf-8")
-
-    print(f"{dim}rewriting with {args.model.split('/')[-1]}...{reset}")
-    rewrite = refactor_mod.refactor(client, source, args.function, model=args.model)
-    if rewrite is None or not rewrite.changed:
-        print(f"{yellow}the model returned no usable rewrite{reset}")
-        return 1
-    patched = refactor_mod.apply(source, args.function, rewrite.rewritten)
-    if patched is None:
-        print(f"{yellow}the rewrite did not apply cleanly{reset}")
-        return 1
-
-    # Diff against the rewrite *as applied*. The model replies at module
-    # indentation and apply() re-indents it, so diffing the raw reply marks every
-    # single line as changed and buries the actual edit.
-    applied = _as_applied(patched, args.function) or rewrite.rewritten
-    show_diff(rewrite.original, applied, dim, red, green, reset)
-
-    use_sandbox = not args.local
-    if use_sandbox:
-        ok, why = available()
-        if not ok:
-            print(f"\n{yellow}sandboxes unavailable ({why}); running locally{reset}")
-            use_sandbox = False
-
-    executor = None
-    started = time.monotonic()
-    if use_sandbox:
-        print(f"\n{dim}warming a sandbox checkpoint...{reset}")
-        executor = SandboxExecutor()
-        executor.warm(repo)
-        print(f"{dim}  ready in {time.monotonic() - started:.1f}s, "
-              f"{executor.archive_bytes // 1024} KiB uploaded, "
-              f"{executor.install_mode}{reset}")
-        if executor.install_note:
-            first = executor.install_note.splitlines()[0] if executor.install_note else ""
-            print(f"{dim}  (not installable as a package: {first[:80]}){reset}")
-
-    def probe(expressions: list[str]):
-        if executor is not None:
-            return executor.observe(module, expressions)
-        return local_observe(repo, module, expressions, args.python)
-
-    print(f"{dim}generating probes...{reset}")
-    diff_text = "\n".join(difflib.unified_diff(
-        rewrite.original.splitlines(), rewrite.rewritten.splitlines(),
-        lineterm="", n=4))
-    expressions, _ = generate_validated(
-        client, module, args.function, rewrite.original, probe=probe,
-        n=args.probes,
-        subclasses=receiver_candidates(source, args.function),
-        stateful=is_stateful(source, args.function),
-        diff=diff_text,
-    )
-    if not expressions:
-        print(f"{yellow}no usable probes were generated{reset}")
-        return 1
-    print(f"{dim}  {len(expressions)} probes{reset}")
-
-    print(f"{dim}running both versions...{reset}")
-    if executor is not None:
-        before = executor.observe(module, expressions)
-        after = executor.observe(module, expressions, overlay={rel: patched.encode()})
-    else:
-        before = local_observe(repo, module, expressions, args.python)
-        original_bytes = path.read_bytes()
-        path.write_text(patched, encoding="utf-8")
-        try:
-            after = local_observe(repo, module, expressions, args.python, baseline=False)
-        finally:
-            path.write_bytes(original_bytes)
-
-    if executor is not None:
-        divergences, flaky = confirm(
-            compare(before, after),
-            run_before=lambda e: executor.observe(module, e),
-            run_after=lambda e: executor.observe(module, e, overlay={rel: patched.encode()}),
-        )
-    else:
-        divergences, flaky = compare(before, after), []
-    if flaky:
-        print(f"{dim}{len(flaky)} probe(s) disagreed once but not on repeat — "
-              f"discarded as nondeterministic{reset}")
-    elapsed = time.monotonic() - started
-    spend = client.ledger.total_usd - opening_spend
-
-    print()
-    if not divergences:
-        index = {o.input: o for o in after}
-        agreed = sum(1 for b in before
-                     if b.ok and index.get(b.input) and index[b.input].ok)
-        print(f"{green}{bold}Behaviour preserved.{reset}  {agreed} of "
-              f"{len(expressions)} probes ran on both versions and agreed on every one.")
-        print(f"{dim}{elapsed:.1f}s, ${spend:.4f}{reset}")
-        return 0
-
-    print(f"{red}{bold}Behaviour changed.{reset}  {len(divergences)} of "
-          f"{len(expressions)} probes disagree.\n")
-    for divergence in divergences[: args.show]:
-        print(f"  {bold}{divergence.input}{reset}")
-        side = divergence.before
-        print(f"    before: {green}{side.value if side.ok else side.error}{reset}")
-        side = divergence.after
-        print(f"    after:  {red}{side.value if side.ok else side.error}{reset}")
-        if divergence.kind == "message":
-            print(f"    {dim}(only the error wording differs){reset}")
-        print()
-    remaining = len(divergences) - args.show
-    if remaining > 0:
-        print(f"  {dim}...and {remaining} more{reset}\n")
-    print(f"{dim}{elapsed:.1f}s, ${spend:.4f}{reset}")
-    return 1
+    return _render(
+        run_function(repo, args.function, model=args.model, probes=args.probes,
+                     forks=args.forks, cap=args.cap, use_sandbox=not args.local,
+                     python=args.python),
+        not args.no_color and sys.stdout.isatty(), args.show)
 
 
 def verify_diff(args: argparse.Namespace) -> int:
-    """Review a change that already exists, rather than inventing one."""
-    bold, dim, red, green, yellow, reset = _palette(
-        not args.no_color and sys.stdout.isatty())
     repo = Path(args.repo).expanduser().resolve()
     if not (repo / ".git").exists():
-        print(f"{red}not a git repository: {repo}{reset}", file=sys.stderr)
+        print(f"not a git repository: {repo}", file=sys.stderr)
         return 2
-
-    try:
-        review = review_mod.plan(repo, args.base, args.head, max_targets=args.max_functions)
-    except ValueError as exc:
-        print(f"{red}{exc}{reset}", file=sys.stderr)
-        return 2
-
-    print(f"{bold}{repo.name}{reset}  {args.base}..{args.head}  "
-          f"{dim}({review.base[:8]}..{review.head[:8]}){reset}")
-    if not review.targets:
-        print(f"\n{yellow}nothing to verify — no changed lines sit inside a "
-              f"function we can probe{reset}")
-        for path, why in review.skipped[:5]:
-            print(f"  {dim}{path}: {why}{reset}")
-        return 0
-    print(f"{dim}{len(review.targets)} changed function(s) to check"
-          + (f", {len(review.skipped)} skipped" if review.skipped else "") + f"{reset}\n")
-
-    client = NemotronClient(cap_usd=args.cap)
-    opening_spend = client.ledger.total_usd
-    started = time.monotonic()
-
-    executor = None
-    if not args.local:
-        ok, why = available()
-        if ok:
-            print(f"{dim}warming a checkpoint at {review.base[:8]}...{reset}")
-            executor = SandboxExecutor()
-            executor.warm_archive(tarball_at(repo, review.base), repo)
-            print(f"{dim}  ready in {time.monotonic() - started:.1f}s, "
-                  f"{executor.archive_bytes // 1024} KiB, {executor.install_mode}{reset}\n")
-        else:
-            print(f"{yellow}sandboxes unavailable ({why}); running locally{reset}\n")
-
-    if executor is None:
-        print(f"{red}verify-diff needs Sandboxes: comparing two revisions locally "
-              f"would mean checking them out under you.{reset}", file=sys.stderr)
-        return 2
-
-    findings = 0
-    for target in review.targets:
-        print(f"{bold}{target.qualname}{reset}  {dim}{target.path}{reset}")
-        head_overlay = {target.path: file_at(repo, review.head, target.path)}
-
-        def probe(expressions, _overlay=None):
-            return executor.observe(target.module, expressions, overlay=_overlay)
-
-        expressions, _ = generate_validated(
-            client, target.module, target.qualname,
-            focused_module(target.base_source, target.qualname),
-            probe=lambda e: probe(e),
-            n=args.probes,
-            subclasses=receiver_candidates(target.base_source, target.qualname),
-            stateful=is_stateful(target.base_source, target.qualname),
-            diff=review_mod.hunk(repo, review.base, review.head, target.path),
-        )
-        if not expressions:
-            print(f"  {yellow}no usable probes{reset}\n")
-            continue
-
-        before = probe(expressions)
-        after = probe(expressions, head_overlay)
-        divergences, flaky = confirm(
-            compare(before, after),
-            run_before=lambda e: probe(e),
-            run_after=lambda e: probe(e, head_overlay),
-        )
-        if flaky:
-            print(f"  {dim}{len(flaky)} probe(s) disagreed once but not on repeat "
-                  f"— discarded as nondeterministic{reset}")
-        if not divergences:
-            index = {o.input: o for o in after}
-            agreed = sum(1 for b in before
-                         if b.ok and index.get(b.input) and index[b.input].ok)
-            print(f"  {green}preserved{reset} {dim}— {agreed}/{len(expressions)} "
-                  f"probes agreed{reset}\n")
-            continue
-
-        findings += 1
-        print(f"  {red}{bold}behaviour changed{reset} — {len(divergences)} of "
-              f"{len(expressions)} probes disagree")
-        for d in divergences[: args.show]:
-            print(f"    {bold}{d.input}{reset}")
-            print(f"      before: {green}{d.before.value if d.before.ok else d.before.error}{reset}")
-            print(f"      after:  {red}{d.after.value if d.after.ok else d.after.error}{reset}")
-        print()
-
-    elapsed = time.monotonic() - started
-    spend = client.ledger.total_usd - opening_spend
-    if findings:
-        print(f"{red}{bold}{findings} of {len(review.targets)} changed functions "
-              f"behave differently.{reset}")
-    else:
-        print(f"{green}{bold}No behaviour change detected{reset} across "
-              f"{len(review.targets)} changed functions.")
-    print(f"{dim}{elapsed:.1f}s, ${spend:.4f}{reset}")
-    return 1 if findings else 0
+    return _render(
+        run_diff(repo, args.base, args.head, probes=args.probes, forks=args.forks,
+                 cap=args.cap, max_functions=args.max_functions),
+        not args.no_color and sys.stdout.isatty(), args.show)
 
 
 def doctor(_args: argparse.Namespace) -> int:
     from .config import have_nebius, nebius_project_id
+    from .models import NemotronClient
+    from .sandbox import available
 
     ok, why = available()
     print(f"  credentials   {'ok' if have_nebius() else 'NEBIUS_API_KEY missing'}")
@@ -330,34 +209,33 @@ def doctor(_args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mutiny",
-        description="Check whether a rewrite preserved a function's behaviour.")
+        description="Check whether a change preserved a function's behaviour.")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    def common(p):
+        p.add_argument("--probes", type=int, default=30)
+        p.add_argument("--forks", type=int, default=8)
+        p.add_argument("--show", type=int, default=3, help="witnesses to print")
+        p.add_argument("--cap", type=float, default=5.0, help="spend cap, USD")
+        p.add_argument("--no-color", action="store_true")
+
     v = sub.add_parser("verify", help="rewrite a function, then verify the rewrite")
-    v.add_argument("repo", help="path to the repository")
-    v.add_argument("function", help="function to rewrite, e.g. Version.next_version")
+    v.add_argument("repo")
+    v.add_argument("function", help="e.g. Version.next_version")
     v.add_argument("--local", action="store_true",
-                   help="run probes locally instead of in Sandboxes")
-    v.add_argument("--python", default=sys.executable,
-                   help="interpreter for local runs (default: this one)")
+                   help="run probes on this machine instead of in Sandboxes")
+    v.add_argument("--python", default=sys.executable)
     v.add_argument("--model", default="nvidia/nemotron-3-super-120b-a12b")
-    v.add_argument("--probes", type=int, default=30)
-    v.add_argument("--show", type=int, default=3, help="divergences to print")
-    v.add_argument("--cap", type=float, default=5.0, help="spend cap, USD")
-    v.add_argument("--no-color", action="store_true")
+    common(v)
     v.set_defaults(func=verify)
 
     r = sub.add_parser("verify-diff",
                        help="verify a change that already exists (branch, PR, commit)")
-    r.add_argument("repo", help="path to the repository")
+    r.add_argument("repo")
     r.add_argument("--base", default="main", help="revision to compare against")
     r.add_argument("--head", default="HEAD", help="revision under review")
     r.add_argument("--max-functions", type=int, default=10)
-    r.add_argument("--probes", type=int, default=30)
-    r.add_argument("--show", type=int, default=2)
-    r.add_argument("--cap", type=float, default=5.0, help="spend cap, USD")
-    r.add_argument("--local", action="store_true", help=argparse.SUPPRESS)
-    r.add_argument("--no-color", action="store_true")
+    common(r)
     r.set_defaults(func=verify_diff)
 
     d = sub.add_parser("doctor", help="check credentials, models and sandbox access")

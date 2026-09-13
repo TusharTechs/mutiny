@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "mypy>=1.11"]
+web = ["fastapi>=0.115", "uvicorn[standard]>=0.32"]
 
 [project.scripts]
 mutiny = "mutiny.cli:main"
