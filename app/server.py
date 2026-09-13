@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from mutiny import budget
+from mutiny import budget, paths
 from mutiny.sandbox import available
 from mutiny.session import verify_url
 
@@ -173,9 +173,15 @@ async def run(request: Request, example_id: str, probes: int = 24, forks: int = 
 
 @app.get("/api/health")
 def health() -> dict:
+    """Enough to tell a broken deployment from a broken run.
+
+    `state` is here because two outages were caused by writing beside the code
+    on a read-only filesystem, and neither was diagnosable from the outside.
+    """
     ok, why = available()
     return {"ok": True, "sandboxes": ok, "detail": why,
-            "spent": round(budget.spent(), 4), "cap": budget.TOTAL_USD}
+            "spent": round(budget.spent(), 4), "cap": budget.TOTAL_USD,
+            "state": str(paths.state(".cache"))}
 
 
 @app.get("/")
