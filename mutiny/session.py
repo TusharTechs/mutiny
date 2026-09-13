@@ -127,6 +127,7 @@ def verify_function(
     cap: float = 5.0,
     use_sandbox: bool = True,
     python: str | None = None,
+    executor: SandboxExecutor | None = None,
 ) -> Iterator[Event]:
     """Rewrite a function with Nemotron, then check the rewrite preserved behaviour."""
     import sys
@@ -163,7 +164,7 @@ def verify_function(
         base_source=source, overlay={rel: patched.encode()},
         diff_text="\n".join(_unified(rewrite.original, applied)),
         probes=probes, forks=forks, use_sandbox=use_sandbox, python=python,
-        started=started, opening=opening, archive=None,
+        started=started, opening=opening, archive=None, executor=executor,
     )
 
 
@@ -262,24 +263,85 @@ def verify_url(
                                    probes=probes, forks=forks, cap=cap,
                                    max_functions=max_functions)
         else:
-            target = _busiest_function(source.path)
-            if target is None:
-                yield _event("error",
-                             message=f"no function in {source.slug} was suitable to rewrite")
-                return
-            yield from verify_function(source.path, target, probes=probes,
-                                       forks=forks, cap=cap)
+            yield from _verify_repository(source, probes=probes, forks=forks,
+                                          cap=cap, attempts=3)
     finally:
         if not keep:
             cleanup(source)
 
 
+def _verify_repository(
+    source, *, probes: int, forks: int, cap: float, attempts: int = 3,
+) -> Iterator[Event]:
+    """Rewrite and check a function of a repository, moving on if one is unprobeable.
+
+    One sandbox is warmed for the whole walk, so falling back to a second target
+    costs a rewrite and a round of probe generation, not another install.
+    """
+    candidates = _candidate_functions(source.path, limit=attempts)
+    if not candidates:
+        yield _event("error",
+                     message=f"no function in {source.slug} was suitable to rewrite")
+        return
+
+    started = time.monotonic()
+    executor = None
+    ok, why = available()
+    if ok:
+        yield _event("status", stage="checkpoint", text="warming a sandbox checkpoint")
+        try:
+            executor = SandboxExecutor()
+            executor.warm(source.path)
+            yield _event("checkpoint", seconds=round(time.monotonic() - started, 1),
+                         kib=executor.archive_bytes // 1024, mode=executor.install_mode)
+        except Exception as exc:  # noqa: BLE001 - local execution is the fallback
+            executor = None
+            yield _event("status", stage="checkpoint",
+                         text=f"sandbox unavailable ({type(exc).__name__}); running locally")
+
+    for index, target in enumerate(candidates):
+        probed = True
+        for event in verify_function(source.path, target, probes=probes,
+                                     forks=forks, cap=cap, executor=executor):
+            if event.get("event") == "no_probes":
+                probed = False
+                remaining = len(candidates) - index - 1
+                yield _event(
+                    "status", stage="probes",
+                    text=(f"no input could be constructed for {target}"
+                          + (f"; trying {candidates[index + 1]}" if remaining else "")))
+                continue
+            yield event
+        if probed:
+            return
+
+    yield _event("verdict", changed=False, functions=0, findings=0,
+                 seconds=round(time.monotonic() - started, 1), cost=0.0)
+    yield _event("error", message=(
+        f"none of the {len(candidates)} busiest functions in {source.slug} could be "
+        "reached by a generated input — they take objects that need real setup. "
+        "Point MUTINY at a pull request, or name a function with --function."))
+
+
 def _busiest_function(repo: Path, ceiling: int = 70) -> str | None:
     """The most heavily branched function, as something worth rewriting."""
+    ranked = _candidate_functions(repo, ceiling=ceiling, limit=1)
+    return ranked[0] if ranked else None
+
+
+def _candidate_functions(repo: Path, ceiling: int = 70, limit: int = 6) -> list[str]:
+    """Functions worth rewriting, most heavily branched first.
+
+    The busiest function in a large framework is often the least reachable one:
+    django, sqlalchemy and requests all put their densest branching behind objects
+    that take a paragraph of setup to build, and no probe generator gets there.
+    Returning a ranked list lets the caller move down it when the top choice
+    produces nothing, instead of reporting an empty result for the repository.
+    """
     import ast
 
     skip = {".git", ".venv", "tests", "test", "build", "dist", "docs", "examples"}
-    best: tuple[int, str] | None = None
+    found: list[tuple[int, str]] = []
     for path in sorted(repo.rglob("*.py")):
         rel = path.relative_to(repo)
         if skip & set(rel.parts) or rel.name.startswith(("test_", "setup", "conf")):
@@ -290,14 +352,13 @@ def _busiest_function(repo: Path, ceiling: int = 70) -> str | None:
             continue
 
         def consider(node, qualname: str) -> None:
-            nonlocal best
             lines = (node.end_lineno or node.lineno) - node.lineno
             if not (5 <= lines <= ceiling):
                 return
             branches = sum(1 for n in ast.walk(node)
                            if isinstance(n, (ast.If, ast.For, ast.While, ast.Try)))
-            if branches and (best is None or branches > best[0]):
-                best = (branches, qualname)
+            if branches:
+                found.append((branches, qualname))
 
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -306,7 +367,13 @@ def _busiest_function(repo: Path, ceiling: int = 70) -> str | None:
                 for child in node.body:
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         consider(child, f"{node.name}.{child.name}")
-    return best[1] if best else None
+
+    ordered, seen = [], set()
+    for _, qualname in sorted(found, key=lambda pair: -pair[0]):
+        if qualname not in seen:
+            seen.add(qualname)
+            ordered.append(qualname)
+    return ordered[:limit]
 
 
 def _probe_and_compare(

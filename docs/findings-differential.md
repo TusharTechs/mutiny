@@ -207,4 +207,61 @@ examples of construction, is the next thing to try.
 Detection is 62% on human `fix:` commits and 33% on known-broken agent
 refactors. Neither is a finished product. What is solid is the direction and the
 precision: the mechanism produces concrete, reproducible, one-line witnesses, it
-costs about a cent per function, and it has never produced a false alarm.
+costs about a cent per function, and every divergence it has reported has been
+reproducible and attributable to the change under test.
+
+# Thin suites — 52 rewrites against a coverage-shrunk oracle
+
+The question behind this experiment: when a test suite is thin, does differential
+execution catch what the suite misses? Four libraries, 52 functions, each
+rewritten by Nemotron and then judged three ways — by the project's full test
+suite, by two coverage-shrunk subsets of it, and by MUTINY.
+
+    rewrites graded                                    49
+      broke behaviour (full suite rejects)              3
+      left behaviour intact (full suite accepts)       46
+
+    of the 3 breaks, MUTINY caught                      2
+    of the 2 breaks a thin subset let through,
+      MUTINY caught                                     1
+
+Three breaks out of 49 is a small denominator and no conclusion should be hung
+on 2/3. The `schedule` miss is honest and already diagnosed: `Job.__repr__`
+needs a constructed `Job`, no probe could be built, and the section above on
+stateful construction is about exactly that failure.
+
+## The case the full suite could not see
+
+One rewrite diverged while the full suite *passed*, which under this
+experiment's oracle scores as a false alarm. Adjudicated by hand, it is not one.
+
+`shortuuid.int_to_string` builds its output by string concatenation and reverses
+the string at the end:
+
+    output += alphabet[digit]
+    ...
+    return output[::-1]
+
+The rewrite collected digits into a list and reversed the list. For a
+single-character alphabet the two are identical. For an alphabet whose entries
+are longer than one character they are not, because reversing the string also
+reverses the characters *inside* each entry:
+
+    int_to_string(1, ['ab', 'cd'])      before 'dc'      after 'cd'
+    int_to_string(7, ['xy','zw','qr'])  before 'rqwz'    after 'qrzw'
+
+Every alphabet in shortuuid's own suite is a string, so every element is one
+character, so the suite cannot distinguish the two implementations. It passes.
+The behaviour changed anyway, deterministically, on the first input the probe
+generator tried that the test authors had not.
+
+This is the shape of finding the project exists for, and unlike the retracted
+cachetools case it survives scrutiny: the inputs are pure, there is no clock, no
+hash seed and no randomness, and the divergence reproduces by hand outside
+MUTINY entirely.
+
+It also means the "never produced a false alarm" claim above needs restating
+precisely: across the corpora measured so far, every divergence reported has
+been reproducible and attributable to the change under test. This one was
+initially *scored* as a false alarm by a grader that assumes a passing suite
+implies preserved behaviour — the assumption the tool is built to doubt.

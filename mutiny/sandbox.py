@@ -31,7 +31,18 @@ MARKER = "\x00MUTINY\x00"
 
 
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-             ".ruff_cache", "node_modules", ".tox", "build", "dist", ".eggs"}
+             ".ruff_cache", "node_modules", ".tox", "build", "dist", ".eggs",
+             "docs", "doc", "examples", "benchmarks", "media", "locale",
+             "static", "images", "img", "assets", "fixtures", ".github"}
+
+# We need the code and enough packaging metadata to install it. Everything else —
+# documentation, images, translations, sample data — is weight on the wire.
+# rich shipped a 14.7 MB archive for 1.7 MB of Python; django's 10.8 MB upload
+# exceeded the transport timeout outright.
+KEEP_SUFFIXES = {".py", ".pyi", ".toml", ".cfg", ".txt", ".ini", ".in"}
+KEEP_NAMES = {"setup.py", "setup.cfg", "pyproject.toml", "MANIFEST.in",
+              "requirements.txt", "tox.ini", "conftest.py"}
+MAX_FILE_BYTES = 2_000_000
 
 EXTRACT = (
     "import tarfile; "
@@ -101,16 +112,25 @@ def file_at(repo: Path, ref: str, path: str) -> bytes:
     return out.stdout
 
 
+UPLOAD_TIMEOUT = 180.0
+
+
 def _client():
     from contree_sdk import ContreeSync
-    from contree_sdk.config import ContreeConfig
 
     tls.apply()
     os.environ.setdefault("NEBIUS_API_KEY", nebius_api_key())
     pid = nebius_project_id()
     if pid:
         os.environ.setdefault("NEBIUS_PROJECT_ID", pid)
-    return ContreeSync()
+    client = ContreeSync()
+    # Ten seconds is the SDK default and a large archive cannot be uploaded in it;
+    # django failed on exactly this.
+    try:
+        client.config.transport_timeout = UPLOAD_TIMEOUT
+    except Exception:  # noqa: BLE001 - an older SDK without the field still works
+        pass
+    return client
 
 
 def tarball(repo: Path) -> bytes:
@@ -126,7 +146,20 @@ def tarball(repo: Path) -> bytes:
             if not path.is_file() or path.is_symlink():
                 continue
             rel = path.relative_to(repo)
-            if SKIP_DIRS & set(rel.parts) or rel.name.endswith((".pyc", ".so")):
+            if SKIP_DIRS & set(rel.parts):
+                continue
+            # Files in the repository root are what packaging metadata points at:
+            # flask's pyproject names README.md, and dropping it made the editable
+            # install fail. They are few and small, so keep the root wholesale.
+            if (len(rel.parts) > 1
+                    and rel.name not in KEEP_NAMES
+                    and path.suffix not in KEEP_SUFFIXES
+                    and not rel.name.startswith(("LICENSE", "COPYING", "NOTICE"))):
+                continue
+            try:
+                if path.stat().st_size > MAX_FILE_BYTES:
+                    continue
+            except OSError:
                 continue
             tar.add(path, arcname=str(rel))
     return buf.getvalue()

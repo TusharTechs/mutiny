@@ -1,0 +1,229 @@
+[
+  {
+    "url": "https://github.com/pallets/flask",
+    "slug": "pallets/flask",
+    "python_files": 83,
+    "source_mb": 0.6,
+    "archive_kb": 747,
+    "function": "find_best_app",
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 3.8,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 10.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 0.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 9.8,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 23.0,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/psf/requests",
+    "slug": "psf/requests",
+    "python_files": 37,
+    "source_mb": 0.4,
+    "archive_kb": 0,
+    "function": "RequestEncodingMixin._encode_files",
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 2.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 17.0,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/Textualize/rich",
+    "slug": "Textualize/rich",
+    "python_files": 213,
+    "source_mb": 1.7,
+    "archive_kb": 14727,
+    "function": "Style.__str__",
+    "probes": 13,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 3.5,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 5.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 0.9,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 15.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 8.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "compare",
+        "seconds": 4.2,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/sqlalchemy/sqlalchemy",
+    "slug": "sqlalchemy/sqlalchemy",
+    "python_files": 673,
+    "source_mb": 19.8,
+    "archive_kb": 3684,
+    "function": "InstanceState._modified_event",
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 5.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.9,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 9.5,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 2.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 20.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 75.6,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/django/django",
+    "slug": "django/django",
+    "python_files": 2932,
+    "source_mb": 18.5,
+    "archive_kb": 10808,
+    "function": "Model._get_unique_checks",
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 25.3,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 1.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 10.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 6.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 17.6,
+        "ok": false,
+        "detail": "ApiTimeoutError: ApiTimeoutError(request=RequestInfo(url='https://api.tokenfactory.nebius.com/sandboxes/v1/files', method='POST'), response=None, timeout_type='read')"
+      }
+    ],
+    "failed_at": "warm"
+  }
+]
