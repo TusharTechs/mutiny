@@ -36,8 +36,21 @@ them, the ceiling is real. Upstash's free tier is enough and needs no card.
 
 ## Deploying
 
+Import the repository at vercel.com/new. Vercel detects the entrypoint named by
+`tool.vercel.entrypoint` in `pyproject.toml` (`main:app`) and routes every
+request to the ASGI app, static files included. Set the environment variables in
+the import form before the first build, so it comes up working.
+
+Or from a terminal:
+
     vercel login
     vercel --prod
 
-The first run asks which scope and project to use. Static files are served by
-the function itself: `vercel.json` rewrites every path to it.
+## Why `pyproject.toml` matters here
+
+Vercel reads dependencies from `pyproject.toml` as readily as from
+`requirements.txt`. `fastapi` was in an optional extra and `contree-sdk` was not
+declared at all — a build that installed from `pyproject.toml` would have come
+up missing both. Both files now pin the same set, so either path produces a
+working deployment. There is a test for the engine; this one is checked by
+installing the project into a clean environment and loading `main:app`.

@@ -5,17 +5,25 @@ description = "Differential verification for AI-written code: run both versions,
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Tushar Agarwal" }]
+# What MUTINY needs to run, including as a deployment. Vercel reads
+# dependencies from this file as readily as from requirements.txt, so anything
+# missing here is a build that fails in production and nowhere else.
 dependencies = [
-    "pytest>=8.0",
     "openai>=1.40",
-    # The orchestrator reads the target's coverage database to find which tests
-    # execute a mutated line; pytest-cov is installed into the target, not here.
-    "coverage>=7.4",
+    # sandbox.py imports this; it was missing, which made the package
+    # installable and broken.
+    "contree-sdk>=0.3",
+    "fastapi>=0.115",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.6", "mypy>=1.11"]
-web = ["fastapi>=0.115", "uvicorn[standard]>=0.32"]
+# pytest and coverage run against the code under test, inside the sandbox --
+# not here. They are needed to run MUTINY's own suite.
+dev = ["ruff>=0.6", "mypy>=1.11", "pytest>=8.0", "coverage>=7.4"]
+web = ["uvicorn[standard]>=0.32"]
+
+[tool.vercel]
+entrypoint = "main:app"
 
 [project.scripts]
 mutiny = "mutiny.cli:main"
