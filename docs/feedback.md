@@ -182,3 +182,23 @@ run forks it without mutating it, and isolation is a property of the model rathe
 than something to enforce. One warm checkpoint at 9.8 s then 40 isolated forks in
 3.7 s is a shape that is genuinely hard to get any other way, and `DisposableImageRunError`
 names the mistake precisely when you try to fork a disposable result.
+
+## `transport_timeout` cannot be changed after the client is built
+
+`ContreeConfig` is a dataclass, so this assigns without error:
+
+    client = ContreeSync()
+    client.config.transport_timeout = 180.0
+
+and has no effect, because the HTTP client was constructed in `__init__` from
+the config's original value. The upload still times out at the ten-second
+default. It has to go through the constructor:
+
+    ContreeSync(config=ContreeConfig(transport_timeout=180.0))
+
+The failure this produced was an `ApiTimeoutError` on `POST /sandboxes/v1/files`
+when uploading a 10.8 MiB archive — a real repository (django) is simply larger
+than ten seconds of upload. Two suggestions: make the default large enough for a
+realistic project archive, and either make the config read at request time or
+make it frozen, so that assigning to it either works or fails loudly rather than
+silently doing nothing.
