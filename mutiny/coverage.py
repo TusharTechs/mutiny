@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -63,7 +64,7 @@ def _cache_path(repo: Path, selector: str, package: str) -> Path | None:
 
 def measure(
     repo: Path,
-    selector: str,
+    selector: str | Sequence[str],
     package: str,
     python_exe: str | None = None,
     timeout: int = 1800,
@@ -71,8 +72,13 @@ def measure(
 ) -> CoverageMap:
     """Run the suite once with per-test contexts and map every line to its tests."""
     python_exe = python_exe or sys.executable
+    # Layouts without a tests/ directory are given a list of files instead, and
+    # passing that straight into the command line fails far from the cause.
+    selectors = [selector] if isinstance(selector, str) else list(selector)
+    if not selectors:
+        return CoverageMap(note="no test selector given")
 
-    cache = _cache_path(repo, selector, package) if use_cache else None
+    cache = _cache_path(repo, "|".join(selectors), package) if use_cache else None
     if cache and cache.is_file():
         raw = json.loads(cache.read_text())
         return CoverageMap(
@@ -88,7 +94,7 @@ def measure(
 
         proc = subprocess.run(
             [
-                python_exe, "-m", "pytest", selector,
+                python_exe, "-m", "pytest", *selectors,
                 f"--cov={package}", "--cov-context=test", "--cov-report=",
                 "-p", "no:cacheprovider", "--rootdir", str(repo), "-q", "--tb=no", "--no-header",
             ],

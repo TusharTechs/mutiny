@@ -1,0 +1,188 @@
+[
+  {
+    "repo": "python-semver",
+    "function": "Version.next_version",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "LookupError: every expression failed with NameError in module 'semver.version' \u2014 the symbols are probably defined in a submodule. First: 'semver.Versi"
+  },
+  {
+    "repo": "python-semver",
+    "function": "Version.compare",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 14,
+    "witnesses": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "function": "Version.match",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 9,
+    "witnesses": [],
+    "error": ""
+  },
+  {
+    "repo": "python-semver",
+    "function": "Version.bump_build",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 15,
+    "witnesses": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "function": "Cache.__setitem__",
+    "refactored": true,
+    "full_suite_passes": false,
+    "subsets_passing": 0,
+    "subsets_total": 3,
+    "divergent": 5,
+    "probes": 11,
+    "witnesses": [
+      "c = LRUCache(2); c[\"a\"]=None; c[\"b\"]=None; (sorted(c.items()), c.currsize, len(c))\n    before: ([('a', None), ('b', None)], 2, 2)\n    after:  raises AttributeError: '_DefaultSize' object has no attribute 'get'",
+      "c = LRUCache(5); c[\"a\"]=None; c[\"b\"]=None; c[\"a\"]=None; (sorted(c.items()), c.currsize, len(c))\n    before: ([('a', None), ('b', None)], 2, 2)\n    after:  raises AttributeError: '_DefaultSize' object has no attribute 'get'"
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "function": "LRUCache.popitem",
+    "refactored": true,
+    "full_suite_passes": false,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 10,
+    "witnesses": [],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "function": "TTLCache.expire",
+    "refactored": true,
+    "full_suite_passes": false,
+    "subsets_passing": 2,
+    "subsets_total": 3,
+    "divergent": 26,
+    "probes": 26,
+    "witnesses": [
+      "c = TTLCache(maxsize=1, ttl=10); c['a']=1; c['b']=2; _now = time.time(); _exp = list(c.expire(_now + 20)); (_exp, dict(c), len(c), c.currsize)\n    before: ([('b', 2)], {}, 0, 0)\n    after:  raises KeyError: 'b'",
+      "c = TTLCache(2, 1); c['a']=1; c['b']=2; _now = time.time(); _exp = list(c.expire(_now + 1.5)); (_exp, dict(c), len(c), c.currsize)\n    before: ([('a', 1), ('b', 2)], {}, 0, 0)\n    after:  raises KeyError: 'a'"
+    ],
+    "error": ""
+  },
+  {
+    "repo": "cachetools",
+    "function": "LFUCache.__setitem__",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 3,
+    "subsets_total": 3,
+    "divergent": 0,
+    "probes": 10,
+    "witnesses": [],
+    "error": ""
+  },
+  {
+    "repo": "schedule",
+    "function": "Job.do",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "schedule",
+    "function": "Job._schedule_next_run",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "schedule",
+    "function": "Scheduler.run_pending",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "schedule",
+    "function": "Job.at",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "shortuuid",
+    "function": "ShortUUID.encode",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "shortuuid",
+    "function": "ShortUUID.decode",
+    "refactored": true,
+    "full_suite_passes": true,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  },
+  {
+    "repo": "shortuuid",
+    "function": "ShortUUID.random",
+    "refactored": true,
+    "full_suite_passes": false,
+    "subsets_passing": 0,
+    "subsets_total": 0,
+    "divergent": 0,
+    "probes": 0,
+    "witnesses": [],
+    "error": "TypeError: expected str, bytes or os.PathLike object, not list"
+  }
+]

@@ -53,13 +53,17 @@ N_INPUTS = 30
 # (repo, module, functions worth rewriting)
 TARGETS = [
     ("python-semver", "semver.version",
-     ["Version.next_version", "Version.compare", "Version.match", "Version.bump_build"]),
+     ["Version.next_version", "Version.compare", "Version.match", "Version.bump_build",
+      "Version.bump_prerelease", "Version.replace", "Version.parse"]),
     ("cachetools", "cachetools",
-     ["Cache.__setitem__", "LRUCache.popitem", "TTLCache.expire", "LFUCache.__setitem__"]),
+     ["Cache.__setitem__", "LRUCache.popitem", "TTLCache.expire", "LFUCache.__setitem__",
+      "FIFOCache.__setitem__", "Cache.__delitem__", "TLRUCache.__setitem__"]),
     ("schedule", "schedule",
-     ["Job.do", "Job._schedule_next_run", "Scheduler.run_pending", "Job.at"]),
+     ["Job.do", "Job._schedule_next_run", "Scheduler.run_pending", "Job.at",
+      "Job.to", "Scheduler.get_jobs", "Job.tag"]),
     ("shortuuid", "shortuuid.main",
-     ["ShortUUID.encode", "ShortUUID.decode", "ShortUUID.random"]),
+     ["ShortUUID.encode", "ShortUUID.decode", "ShortUUID.random",
+      "ShortUUID.set_alphabet", "ShortUUID.uuid"]),
 ]
 
 
@@ -71,6 +75,7 @@ class Case:
     full_suite_passes: bool | None = None
     subsets_passing: int = 0
     subsets_total: int = 0
+    suite_size: int = 0
     divergent: int = 0
     probes: int = 0
     witnesses: list = field(default_factory=list)
@@ -107,12 +112,28 @@ def test_files(repo: Path) -> list[str]:
     return sorted(set(out))
 
 
-def subsets(files: list[str], rng: random.Random) -> list[list[str]]:
-    """Random draws of roughly a third of the test files."""
-    if len(files) <= 1:
+def collect(repo: Path, python_exe: str, selector) -> list[str]:
+    """Every test node id the suite contains.
+
+    Sampling whole files cannot model schedule or shortuuid, which keep their
+    entire suite in one file — the draw is either everything or nothing. Node ids
+    are the unit a suite actually grows in.
+    """
+    sel = [selector] if isinstance(selector, str) else list(selector)
+    out = subprocess.run(
+        [python_exe, "-m", "pytest", *sel, "--collect-only", "-q",
+         "-p", "no:cacheprovider", "--rootdir", str(repo)],
+        cwd=repo, capture_output=True, text=True, timeout=600).stdout
+    return [line.strip() for line in out.splitlines()
+            if "::" in line and not line.startswith(("=", "<", " "))]
+
+
+def subsets(nodes: list[str], rng: random.Random) -> list[list[str]]:
+    """Random draws of roughly a third of the tests."""
+    if len(nodes) < 4:
         return []
-    size = max(1, round(len(files) * SUBSET_FRACTION))
-    return [rng.sample(files, size) for _ in range(SUBSET_DRAWS)]
+    size = max(1, round(len(nodes) * SUBSET_FRACTION))
+    return [rng.sample(nodes, size) for _ in range(SUBSET_DRAWS)]
 
 
 def restore(repo: Path, path: str) -> None:
@@ -141,13 +162,15 @@ def run_case(client, repo: Path, repo_name: str, module: str,
         case.refactored = True
 
         files = test_files(repo)
-        draws = subsets(files, rng)
+        selector = "tests/" if (repo / "tests").is_dir() else files
+        nodes = collect(repo, python_exe, selector)
+        draws = subsets(nodes, rng)
         case.subsets_total = len(draws)
+        case.suite_size = len(nodes)
 
         path.write_text(patched, encoding="utf-8")
         try:
-            full = run_pytest(repo, "tests/" if (repo / "tests").is_dir() else files,
-                              python_exe, timeout=900)
+            full = run_pytest(repo, selector, python_exe, timeout=900)
             case.full_suite_passes = full.verdict == PASSED
             for draw in draws:
                 sub = run_pytest(repo, draw, python_exe, timeout=900)
@@ -157,8 +180,7 @@ def run_case(client, repo: Path, repo_name: str, module: str,
             restore(repo, rel)
 
         # Probe regardless: the comparison is only meaningful alongside the suites.
-        cov = measure(repo, "tests/" if (repo / "tests").is_dir() else files,
-                      module.split(".")[0], python_exe)
+        cov = measure(repo, selector, module.split(".")[0], python_exe)
         examples = []
         if cov.measured:
             from mutiny.coverage import covering_examples
