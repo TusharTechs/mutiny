@@ -1,6 +1,10 @@
+<img src="docs/brand/mark.svg" width="72" alt="">
+
 # MUTINY
 
 **Did that refactor actually preserve behaviour?**
+
+[Live demo](https://mutiny-verify.vercel.app) · [Architecture](#architecture) · [Results](#results)
 
 An agent rewrites your function. The tests pass. MUTINY runs both versions on
 hundreds of generated inputs and shows you the exact input where they disagree —
@@ -290,30 +294,162 @@ The benchmarks clone three real repositories and run against their history:
 
 ## Architecture
 
+A URL goes in. Two versions of the same code come out the other side, running on
+the same generated inputs inside the same sandbox image, and the answer is either
+an input where they disagree or a statement that none was found.
+
+```mermaid
+flowchart TB
+    URL(["<b>GitHub URL</b><br/>a repository, or a pull request"])
+    REMOTE["<b>remote.py</b> — two revisions over HTTPS<br/>tarballs · merge base from the API · no git binary"]
+
+    subgraph WHAT ["What are the two versions?"]
+        direction LR
+        PR["<b>pull request</b><br/>review.py<br/>merge base vs head"]
+        RW["<b>repository</b><br/>refactor.py<br/>Nemotron rewrites the busiest function"]
+    end
+
+    WARM[["<b>Nebius Sandboxes</b> — install once, then fork<br/>checkpoint warm in 9.8s"]]
+    GEN["<b>inputs.py</b> — Nemotron writes probes<br/>every probe is executed before it counts as one"]
+
+    subgraph FORK ["One checkpoint, forked 40 ways · 3.7s"]
+        direction LR
+        BEFORE["<b>before</b><br/>the original"]
+        AFTER["<b>after</b><br/>the change"]
+    end
+
+    CMP["<b>differential.py</b><br/>canonicalise both sides, then compare"]
+    CONF{"<b>confirm</b><br/>run the same version twice —<br/>does the divergence reproduce?"}
+    EXP["<b>explain.py</b> — Nemotron writes one sentence,<br/>allowed to describe only what executed"]
+    OUT(["<b>Witness</b><br/>the input, and what each version returned"])
+    NONE(["<b>No divergence found</b><br/>n probes ran on both and agreed"])
+
+    URL --> REMOTE --> WHAT --> WARM --> GEN --> FORK --> CMP
+    CMP -- "they disagree" --> CONF
+    CMP -- "all agreed" --> NONE
+    CONF -- "reproduces" --> EXP --> OUT
+    CONF -- "flaky — not evidence" --> NONE
+
+    style URL fill:#4ecdc4,stroke:#2a9d94,color:#000
+    style WARM fill:#e879f9,stroke:#c026d3,color:#000
+    style GEN fill:#fbbf24,stroke:#d97706,color:#000
+    style CONF fill:#fbbf24,stroke:#d97706,color:#000
+    style EXP fill:#fbbf24,stroke:#d97706,color:#000
+    style OUT fill:#e56a6a,stroke:#b83c3c,color:#000
+    style NONE fill:#5ac77e,stroke:#2f9350,color:#000
+```
+
+### The one idea this is built on
+
+> **Inputs don't need to be correct. Assertions do.**
+
+Ask a model to write a *test* and it must produce an assertion — a claim about
+what the right answer is. Get that wrong and you have manufactured a false
+finding out of nothing.
+
+Ask a model to write an *input* and it cannot lie. A bad input is rejected
+identically by both versions and contributes nothing. A good one is executed
+twice, and the two results are compared by a machine that has no opinion about
+which is correct.
+
+That inversion is the whole design. **The model generates candidates; execution
+produces the evidence.** It is also why this works at all — an earlier version
+that asked Nemotron to produce proofs scored 13% at both 120B and 550B, and no
+amount of model size fixed it.
+
+### Why there are two revisions, not one
+
+| Input | `before` | `after` |
+|---|---|---|
+| Pull request URL | the merge base | the head commit |
+| Repository URL | the code as written | Nemotron's rewrite of it |
+| `mutiny verify-diff` | any ref | any ref |
+
+Comparing against the *merge base* rather than the base branch tip matters: other
+people's work on `main` is not this author's change, and attributing it to them
+produces findings that waste a reviewer's time.
+
+### Nondeterminism is the adversary, not the bug
+
+The first version of this reported findings that were real divergences and
+completely worthless. Five separate causes, each found by chasing a confident,
+specific, false result:
+
+| Cause | What it looked like | Fix |
+|---|---|---|
+| Memory addresses | every object without `__repr__` "changed" | strip `at 0x...` |
+| Set and dict order | identical frozensets, different repr | sort before comparing |
+| Hash seed | a real-looking cache eviction bug | pin `PYTHONHASHSEED` |
+| `random` | `RRCache` evicts differently each run | seed it |
+| `os.urandom` | `uuid4` differs by construction | require self-consistency |
+
+The last one is the general answer and the reason `confirm` exists: before a
+divergence is reported, the *same version* is run twice on the same input. If it
+disagrees with itself, the probe is discarded — it was never evidence. One of
+these got as far as being called "the finding this project exists for" before it
+turned out to be hash-seed randomisation; that retraction is written up in
+[`docs/findings-differential.md`](docs/findings-differential.md).
+
+### What Sandboxes make possible
+
+Installing a real repository takes tens of seconds. Doing that once per probe
+would make the whole approach unusable, which is the practical reason
+differential verification is not already a common technique.
+
+A Nebius Sandbox checkpoint is installed **once** and then forked. Forty forks
+run in **3.7s** against **50.4s** sequentially, and the forks are microVMs rather
+than threads — so a probe that segfaults, hangs, or deletes a file takes nothing
+with it. Executing a stranger's pull request is the entire point, and it never
+touches the server.
+
+| | measured |
+|---|---|
+| Warm a checkpoint | 9.8s |
+| 40 forks, concurrent | 3.7s |
+| 40 runs, sequential | 50.4s |
+| Django — 2932 files, end to end | 83s |
+| Cost of one verification | ~$0.005 |
+
+### Where each model earns its place
+
+Model choice here is decided by the *shape* of the task, not by parameter count.
+
+| Task | Model | Why |
+|---|---|---|
+| Generating probes | **Nemotron 3 Super 120B** | 42 usable inputs in 10.7s with zero reasoning tokens. Nano spent 26,300 reasoning characters to produce 44; Lightning produced 1. |
+| Rewriting a function | **Nemotron 3 Super 120B** | Needs to produce plausible, compiling code — not to be right |
+| Explaining a witness | **Nemotron 3 Super 120B** | Grounded in evidence already on the page; the prompt forbids speculating about intent or correctness |
+| Fallback on empty reply | **Nemotron 3 Ultra 550B** | Super uniquely returns empty content *and* empty reasoning under token pressure — reported in [`docs/feedback.md`](docs/feedback.md) |
+
+### The modules
+
 | module | responsibility |
 |---|---|
 | `mutiny/session.py` | the verification loop, yielded as events |
-| `mutiny/cli.py` | terminal rendering of that stream |
-| `mutiny/review.py` | resolving a branch or commit into changed functions |
-| `mutiny/explain.py` | Nemotron describes the change, grounded in the witnesses |
-| `mutiny/fetch.py` | a GitHub URL becomes a working copy, and a PR its merge base |
-| `app/` | the web interface — the same events over server-sent events |
-| `mutiny/refactor.py` | Nemotron rewrites a function; the rewrite is applied in place |
-| `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |
 | `mutiny/differential.py` | runs both versions, canonicalises observations, compares |
-| `mutiny/coverage.py` | which tests execute which line — steers probes and test selection |
+| `mutiny/sandbox.py` | warm checkpoint, forks, archive upload |
+| `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |
+| `mutiny/remote.py` | GitHub over HTTPS — tarballs, merge base, no git binary |
+| `mutiny/review.py` | resolving a change into changed functions |
+| `mutiny/refactor.py` | Nemotron rewrites a function; applied in place |
+| `mutiny/explain.py` | Nemotron describes the change, grounded in the witnesses |
 | `mutiny/diff.py` | changed lines, source-vs-test filtering, enclosing functions |
-| `mutiny/source.py` | locating a function by qualified name, and showing just enough of it |
-| `mutiny/models.py` | Token Factory client: spend cap, ledger, caching, retry |
-| `mutiny/sandbox.py` | the same execution, forked from a warm Sandboxes checkpoint |
+| `mutiny/coverage.py` | which tests execute which line — steers probes and test selection |
+| `mutiny/source.py` | locating a function by qualified name, showing just enough of it |
+| `mutiny/models.py` | Token Factory client: per-run spend cap, ledger, caching, retry |
+| `mutiny/budget.py` | what a public deployment is allowed to spend |
+| `mutiny/fetch.py` | git clone, for local experiments that have git |
 | `mutiny/tls.py` | reactive certificate-trust repair for inspecting proxies |
+| `mutiny/cli.py` | terminal rendering of the event stream |
+| `app/` | the web interface — the same events over server-sent events |
+
+One engine produces the events; the CLI and the browser are two renderings of it.
+There is no second implementation to drift.
 
 An observation records the value's **type**, a canonicalised `repr`, and for
 failures the exception type and normalised message. Memory addresses are
 stripped, unordered containers are sorted, and the hash seed is pinned — because
-an observation that varies for reasons the caller cannot control is not
-evidence. Each of those was added after it produced a confident, specific,
-entirely false finding.
+an observation that varies for reasons the caller cannot control is not evidence.
 
 ## What it does not do
 

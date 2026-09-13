@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 72" width="320" height="72" role="img" aria-label="MUTINY">
+  <title>MUTINY</title>
+  <rect width="320" height="72" fill="#ffffff"/>
+  <g transform="translate(16 12)" fill="none" stroke-width="3.4" stroke-linecap="round">
+    <path d="M6 24 H18" stroke="#5d6878"/>
+    <path d="M18 24 C25 24 25 12 38 12" stroke="#4ecdc4"/>
+    <path d="M18 24 C25 24 25 36 38 36" stroke="#e56a6a"/>
+    <circle cx="18" cy="24" r="5" fill="#ffffff" stroke="none"/>
+    <circle cx="18" cy="24" r="3" fill="#0d1014" stroke="none"/>
+  </g>
+  <text x="80" y="48" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="34" font-weight="700" letter-spacing="7" fill="#0d1014">MUT<tspan fill="#4ecdc4">I</tspan>NY</text>
+</svg>
