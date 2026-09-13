@@ -24,9 +24,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DRIVER = r'''
-import ast, importlib, json, os, re, sys
+import ast, importlib, json, os, random, re, sys
 
 sys.path.insert(0, os.getcwd())
+
+# Anything drawing on `random` differs between two runs for reasons the caller
+# cannot control. cachetools' RRCache evicts a random entry, and comparing two
+# unseeded runs of it reports a behaviour change on every probe.
+random.seed(0)
 
 # repr() falls back to the object's memory address, which differs on every
 # process. Left alone it makes any object without a custom __repr__ diverge by
@@ -266,3 +271,38 @@ def agreement(before: list[Observation], after: list[Observation]) -> tuple[int,
         usable += b.ok and a.ok
         diverged += a.outcome != b.outcome
     return compared, usable, diverged
+
+
+def confirm(
+    divergences: list[Divergence],
+    run_before,
+    run_after,
+    rounds: int = 2,
+) -> tuple[list[Divergence], list[Divergence]]:
+    """Re-run the divergent probes; keep only those that disagree every time.
+
+    Seeding `random` handles the obvious case, but nondeterminism has many
+    sources — clocks, iteration order, address-derived hashing, the network — and
+    a comparison of two single runs cannot tell a real change from a coin toss.
+    Confirming costs one extra pair of runs over the divergent probes alone,
+    which is usually a handful, and it is the difference between a tool people
+    trust and one they mute.
+
+    Returns (confirmed, flaky).
+    """
+    if not divergences:
+        return [], []
+    inputs = [d.input for d in divergences]
+    still: set[str] = set(inputs)
+    for _ in range(max(1, rounds)):
+        before = {o.input: o for o in run_before(inputs)}
+        after = {o.input: o for o in run_after(inputs)}
+        for name in list(still):
+            b, a = before.get(name), after.get(name)
+            if b is None or a is None or b.opaque or a.opaque or a.outcome == b.outcome:
+                still.discard(name)
+        if not still:
+            break
+    confirmed = [d for d in divergences if d.input in still]
+    flaky = [d for d in divergences if d.input not in still]
+    return confirmed, flaky

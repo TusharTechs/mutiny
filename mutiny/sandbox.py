@@ -71,6 +71,36 @@ def declared_dependencies(repo: Path) -> list[str]:
     return [d for d in deps if isinstance(d, str)]
 
 
+def tarball_at(repo: Path, ref: str) -> bytes:
+    """The repository as it stands at `ref`, without touching the working tree.
+
+    A tool that reviews a branch must not check that branch out — the developer
+    is sitting in their own working copy, and CI may have several jobs sharing a
+    clone. `git archive` reads any revision straight out of the object store.
+    """
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "archive", "--format=tar.gz", ref],
+        cwd=repo, capture_output=True, check=False, timeout=300,
+    )
+    if out.returncode != 0:
+        raise RuntimeError(
+            f"git archive {ref} failed: {out.stderr.decode(errors='replace')[:200]}")
+    return out.stdout
+
+
+def file_at(repo: Path, ref: str, path: str) -> bytes:
+    """One file's contents at `ref`, again without checking anything out."""
+    import subprocess
+
+    out = subprocess.run(["git", "show", f"{ref}:{path}"], cwd=repo,
+                         capture_output=True, check=False, timeout=120)
+    if out.returncode != 0:
+        raise FileNotFoundError(f"{path} does not exist at {ref}")
+    return out.stdout
+
+
 def _client():
     from contree_sdk import ContreeSync
     from contree_sdk.config import ContreeConfig
@@ -132,6 +162,17 @@ class SandboxExecutor:
             self._client_obj = tls.with_repair(_client)
         return self._client_obj
 
+    def warm_archive(
+        self, archive: bytes, repo: Path | None = None,
+        install: tuple[str, ...] | None = None,
+    ) -> object:
+        """Warm a checkpoint from an archive rather than a directory.
+
+        `repo` is still used to read declared dependencies when the install
+        fails; pass None to skip that.
+        """
+        return self._warm_from(archive, repo, install)
+
     def warm(self, repo: Path, install: tuple[str, ...] | None = None) -> object:
         """Upload the repository, make it importable, and keep that as a checkpoint.
 
@@ -145,7 +186,11 @@ class SandboxExecutor:
         only the declared dependencies, and rely on the working directory being
         on `sys.path`, which is enough to import the module under test.
         """
-        archive = tarball(repo)
+        return self._warm_from(tarball(repo), repo, install)
+
+    def _warm_from(
+        self, archive: bytes, repo: Path | None, install: tuple[str, ...] | None
+    ) -> object:
         self._archive_bytes = len(archive)
         image = self.client.images.use(self.base_image)
         image = _check(image.run(
@@ -166,7 +211,7 @@ class SandboxExecutor:
             self._warm = attempt
             return self._warm
 
-        deps = declared_dependencies(repo)
+        deps = declared_dependencies(repo) if repo is not None else []
         self.install_note = (attempt.stderr or attempt.stdout or "").strip()[-300:]
         if deps:
             self.install_mode = f"dependencies only ({len(deps)})"

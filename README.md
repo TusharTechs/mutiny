@@ -207,6 +207,32 @@ Behaviour changed.  5 of 10 probes disagree.
 `--local` runs the probes on this machine instead, which is faster for a single
 pass and appropriate only for code you trust.
 
+### Reviewing a change that already exists
+
+```bash
+mutiny verify-diff path/to/repo --base main --head my-branch
+```
+
+Finds the functions a branch touched and checks each one, comparing the two
+revisions. Nothing is checked out — `git archive` and `git show` read straight
+out of the object store, so your working copy is untouched and CI jobs sharing a
+clone do not fight each other. One checkpoint is warmed at the merge base, and
+each fork has the head version of the changed files laid over the top.
+
+```
+python-semver  d8813b67^..d8813b67
+2 changed function(s) to check, 1 skipped
+
+Version.next_version  src/semver/version.py
+  behaviour changed — 1 of 14 probes disagree
+    str(Version(1,2,3, prerelease="rc").next_version("prerelease"))
+      before: '1.2.3-rc'
+      after:  '1.2.3-rc.0'
+
+2 of 2 changed functions behave differently.
+28.4s, $0.0070
+```
+
 ## Setup
 
 ```bash
@@ -259,6 +285,10 @@ entirely false finding.
   changed `__context__` while preserving the raised type and message.
 - **Pinning the hash seed hides seed-dependent behaviour.** Necessary to compare
   two runs at all, and a real trade-off: it cost us a finding we had to retract.
+- **Rich domain objects are hard to probe.** Everything found so far takes
+  primitives or simply-constructible values. A function wanting three populated
+  domain objects and a timezone-aware datetime defeats the generator, and yield
+  collapses to zero.
 - **Unreachable code stays unreached.** A branch requiring a particular OS, a
   network condition or a race has no call expression that gets to it.
 
