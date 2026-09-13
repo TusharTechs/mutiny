@@ -210,6 +210,14 @@ function wire(source) {
   stream.onerror = finish;
 }
 
+// Examples are ordinary GitHub URLs, the same ones a visitor can paste in.
+// Showing the slug makes that obvious rather than implying a private fixture.
+function slugOf(url) {
+  const m = /github\.com\/([\w.-]+)\/([\w.-]+?)(?:\/pull\/(\d+))?\/?$/.exec(url || "");
+  if (!m) return "";
+  return `${m[1]}/${m[2]}` + (m[3] ? `#${m[3]}` : "");
+}
+
 async function boot() {
   const res = await fetch("/api/examples");
   const data = await res.json();
@@ -219,6 +227,16 @@ async function boot() {
     ? `sandboxes ready · ${data.sandboxes.detail}`
     : "sandboxes unavailable";
   badge.className = "badge " + (data.sandboxes.available ? "ok" : "bad");
+
+  if (data.budget && data.budget.exhausted) {
+    const note = $("budget-note");
+    if (note) {
+      note.textContent =
+        "This demo has reached its spending limit. Clone the repo and run it " +
+        "with your own Nebius key.";
+      note.hidden = false;
+    }
+  }
 
   $("url-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -232,7 +250,7 @@ async function boot() {
     const button = el("button", "card");
     button.type = "button";
     button.setAttribute("aria-pressed", "false");
-    button.appendChild(el("span", "repo", example.repo));
+    button.appendChild(el("span", "repo", slugOf(example.url)));
     button.appendChild(el("h3", null, example.title));
     button.appendChild(el("p", null, example.blurb));
     button.addEventListener("click", () => start(example.id, button));

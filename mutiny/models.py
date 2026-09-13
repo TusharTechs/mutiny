@@ -128,8 +128,18 @@ class NemotronClient:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.ledger = Ledger(ledger_path or root / ".cache" / "ledger.json").load()
         self.cap_usd = cap_usd
+        # The ledger is cumulative and survives between runs, so comparing the
+        # cap against its total makes cap_usd a lifetime limit -- every caller
+        # passes it meaning "this run". Left that way the tool refuses to work
+        # at all once enough has been spent, for no reason the user can see.
+        self._opening_usd = self.ledger.total_usd
         self.last_widened_to = 0
         self._client: Any = None
+
+    @property
+    def spent_here(self) -> float:
+        """What this client has spent, as distinct from what the ledger records."""
+        return self.ledger.total_usd - self._opening_usd
 
     # -- lazily construct so importing this module never needs a key
     @property
@@ -188,10 +198,10 @@ class NemotronClient:
         # token count before the call, so assume the request is as large as the
         # model's reply allowance plus a generous prompt.
         worst_case = estimate_cost(model, 40_000, max_tokens)
-        if self.ledger.total_usd + worst_case > self.cap_usd:
+        if self.spent_here + worst_case > self.cap_usd:
             raise BudgetExceeded(
-                f"cap ${self.cap_usd:.2f} would be exceeded: spent "
-                f"${self.ledger.total_usd:.4f}, worst case for this call "
+                f"cap ${self.cap_usd:.2f} would be exceeded: this run has spent "
+                f"${self.spent_here:.4f}, worst case for this call "
                 f"${worst_case:.4f}. Raise cap_usd deliberately if you mean to."
             )
 

@@ -251,3 +251,11 @@ body {
   .sides { grid-template-columns: 1fr; }
   .thesis { font-size: 15px; }
 }
+
+.note {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 2px solid var(--amber, #b8860b);
+  color: var(--dim, #8a8a8a);
+  font-size: 0.9rem;
+}

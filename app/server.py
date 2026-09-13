@@ -3,9 +3,10 @@
 `mutiny.session` yields events; the command line renders them as text and this
 renders them as server-sent events. There is one loop, not two.
 
-Repositories are pre-seeded rather than user-supplied. A public endpoint that
-clones and installs an arbitrary URL on request is a straightforward way to be
-abused, and the demo does not need it.
+Everything here goes through GitHub over HTTPS rather than a git clone, so the
+examples are the same URLs a visitor can paste in themselves -- there is no
+privileged local checkout that only the demo can reach, and nothing to keep in
+sync with the deployment.
 """
 from __future__ import annotations
 
@@ -14,52 +15,49 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from mutiny import budget
 from mutiny.sandbox import available
-from mutiny.session import verify_diff, verify_function, verify_url
+from mutiny.session import verify_url
 
 ROOT = Path(__file__).resolve().parent
-CHECKOUTS = ROOT.parent / "experiments" / "checkouts"
 
-# Each entry is a function worth showing: one that preserves behaviour, one that
-# does not, and a real bug-fix commit reviewed as though it were a pull request.
+# Four things worth showing: a real bug fix whose behaviour change MUTINY finds,
+# a second one on a different library, a repository whose rewrite is clean, and
+# something large enough to answer "does this work on real code?".
 EXAMPLES = [
     {
-        "id": "cachetools-setitem",
-        "repo": "cachetools",
-        "title": "Cache.__setitem__",
-        "blurb": "A cache insert. The rewrite reads as a tidy-up.",
-        "mode": "function",
-        "function": "Cache.__setitem__",
+        "id": "semver-bump-build",
+        "title": "A real bug fix, reviewed",
+        "blurb": "bump_build() silently returned an unchanged version. "
+                 "MUTINY finds the inputs where before and after disagree.",
+        "url": "https://github.com/python-semver/python-semver/pull/480",
+        "expect": "behaviour change",
     },
     {
-        "id": "semver-next-version",
-        "repo": "python-semver",
-        "title": "Version.next_version",
-        "blurb": "Version bumping, with prerelease handling.",
-        "mode": "function",
-        "function": "Version.next_version",
+        "id": "cachetools-maxsize",
+        "title": "A guard added to a constructor",
+        "blurb": "Rejecting a negative maxsize. Does it change anything else?",
+        "url": "https://github.com/tkem/cachetools/pull/413",
+        "expect": "behaviour change",
     },
     {
-        "id": "semver-prerelease-fix",
-        "repo": "python-semver",
-        "title": "A real bug-fix commit",
-        "blurb": "Reviewed as a pull request: two functions changed.",
-        "mode": "diff",
-        "base": "d8813b67^",
-        "head": "d8813b67",
+        "id": "rich-style",
+        "title": "A rewrite that preserves behaviour",
+        "blurb": "Nemotron rewrites Style.__str__ and MUTINY agrees it is the "
+                 "same function. Silence is the harder result to earn.",
+        "url": "https://github.com/Textualize/rich",
+        "expect": "preserved",
     },
     {
-        "id": "cachetools-style",
-        "repo": "cachetools",
-        "title": "A pure style commit",
-        "blurb": "Should be silent. Nondeterminism makes that harder than it sounds.",
-        "mode": "diff",
-        "base": "13bb86a5^",
-        "head": "13bb86a5",
+        "id": "django",
+        "title": "Django, 2932 files",
+        "blurb": "Installed and executed in a Nebius sandbox, not on this server.",
+        "url": "https://github.com/django/django",
+        "expect": "preserved",
     },
 ]
 
@@ -73,15 +71,22 @@ def _example(example_id: str) -> dict:
     raise HTTPException(404, "unknown example")
 
 
+def _caller(request: Request) -> str:
+    """Who is asking. Behind a proxy the socket address is the proxy's."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    return (forwarded.split(",")[0].strip()
+            or (request.client.host if request.client else "unknown"))
+
+
 @app.get("/api/examples")
 def examples() -> dict:
     ok, why = available()
+    total = budget.spent()
     return {
-        "examples": [
-            {k: v for k, v in e.items() if k not in {"base", "head", "function"}}
-            for e in EXAMPLES
-        ],
+        "examples": EXAMPLES,
         "sandboxes": {"available": ok, "detail": why},
+        "budget": {"spent": round(total, 4), "cap": budget.TOTAL_USD,
+                   "exhausted": total >= budget.TOTAL_USD},
     }
 
 
@@ -115,25 +120,27 @@ async def _stream_events(make_events):
         yield f"data: {json.dumps(event)}\n\n"
 
 
-@app.get("/api/run-url")
-async def run_url(url: str, probes: int = 20, forks: int = 8):
-    """Verify a GitHub repository or pull request the visitor supplies.
-
-    Only github.com is accepted, the clone is size-capped, and the repository is
-    installed and executed inside a sandbox rather than on this machine — which
-    is the reason the sandbox exists.
-    """
-    from mutiny.fetch import FetchError, parse
-
-    try:
-        parse(url)
-    except FetchError as exc:
-        raise HTTPException(400, str(exc)) from None
+def _run(url: str, caller: str, probes: int, forks: int):
+    """One verification, with the deployment's spending rules applied."""
+    decision = budget.check(caller)
+    if not decision:
+        def refused():
+            yield {"type": "error", "message": decision.reason}
+        return refused
 
     def events():
         yield {"type": "status", "stage": "fetch", "text": "fetching from GitHub"}
-        yield from verify_url(url, probes=min(probes, 40), forks=min(forks, 16))
+        spend = 0.0
+        for event in verify_url(url, probes=min(probes, 40), forks=min(forks, 16),
+                                cap=budget.PER_RUN_USD):
+            if event.get("type") == "verdict":
+                spend = float(event.get("cost") or 0)
+            yield event
+        budget.record(spend)
+    return events
 
+
+def _sse(events) -> StreamingResponse:
     return StreamingResponse(
         _stream_events(events),
         media_type="text/event-stream",
@@ -141,62 +148,34 @@ async def run_url(url: str, probes: int = 20, forks: int = 8):
     )
 
 
-async def _stream(example: dict, probes: int, forks: int):
-    """Bridge the synchronous generator onto the event loop.
+@app.get("/api/run-url")
+async def run_url(request: Request, url: str, probes: int = 20, forks: int = 8):
+    """Verify a GitHub repository or pull request the visitor supplies.
 
-    The run is blocking and long, so it goes to a worker thread and events come
-    back through a queue; otherwise the first sandbox call would stall every
-    other request on the server.
+    Only github.com is accepted, the download is size-capped, and the repository
+    is installed and executed inside a sandbox rather than on this machine —
+    which is the reason the sandbox exists.
     """
-    repo = CHECKOUTS / example["repo"]
-    queue: asyncio.Queue = asyncio.Queue()
-    loop = asyncio.get_running_loop()
+    from mutiny.fetch import GITHUB
 
-    def produce() -> None:
-        try:
-            if example["mode"] == "diff":
-                events = verify_diff(repo, example["base"], example["head"],
-                                     probes=probes, forks=forks)
-            else:
-                events = verify_function(repo, example["function"],
-                                         probes=probes, forks=forks)
-            for event in events:
-                loop.call_soon_threadsafe(queue.put_nowait, event)
-        except Exception as exc:  # noqa: BLE001 - surface it rather than hanging
-            loop.call_soon_threadsafe(
-                queue.put_nowait,
-                {"type": "error", "message": f"{type(exc).__name__}: {exc}"[:300]})
-        finally:
-            loop.call_soon_threadsafe(queue.put_nowait, None)
-
-    asyncio.get_running_loop().run_in_executor(None, produce)
-    yield f"event: open\ndata: {json.dumps(example)}\n\n"
-    while True:
-        event = await queue.get()
-        if event is None:
-            yield "event: end\ndata: {}\n\n"
-            return
-        yield f"data: {json.dumps(event)}\n\n"
+    if not GITHUB.match(url.strip()):
+        raise HTTPException(400, (
+            "expected a GitHub repository or pull request URL, for example "
+            "https://github.com/psf/requests/pull/1234"))
+    return _sse(_run(url, _caller(request), probes, forks))
 
 
 @app.get("/api/run/{example_id}")
-async def run(example_id: str, probes: int = 24, forks: int = 8):
+async def run(request: Request, example_id: str, probes: int = 24, forks: int = 8):
     example = _example(example_id)
-    return StreamingResponse(
-        _stream(example, min(probes, 60), min(forks, 16)),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return _sse(_run(example["url"], _caller(request), probes, forks))
 
 
 @app.get("/api/health")
 def health() -> dict:
     ok, why = available()
     return {"ok": True, "sandboxes": ok, "detail": why,
-            "repos": sorted(p.name for p in CHECKOUTS.glob("*") if p.is_dir())}
-
-
-app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+            "spent": round(budget.spent(), 4), "cap": budget.TOTAL_USD}
 
 
 @app.get("/")
@@ -204,7 +183,4 @@ def index() -> FileResponse:
     return FileResponse(ROOT / "static" / "index.html")
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")

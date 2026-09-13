@@ -1,0 +1,6 @@
+# Vercel installs from this file. The sandbox SDK and the OpenAI client are the
+# only things the server needs beyond FastAPI; pytest and coverage are for
+# running MUTINY against a target, which happens inside the sandbox, not here.
+fastapi>=0.115
+openai>=1.40
+contree-sdk
