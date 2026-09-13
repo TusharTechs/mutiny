@@ -34,6 +34,7 @@ from .fetch import FetchError
 from .inputs import generate_validated, is_stateful, receiver_candidates
 from .models import NemotronClient
 from .sandbox import SandboxExecutor, available, file_at, tarball, tarball_at
+from .scenarios import construction_examples
 from .source import focused_module, function_span
 
 Event = dict[str, Any]
@@ -499,6 +500,15 @@ def _probe_and_compare(
 
     runner = Runner(executor, repo, python)
 
+    # The repository's own tests were written by people who know how these
+    # objects go together. Showing them is cheaper than asking the model to
+    # invent a construction sequence it has no way to check.
+    examples = construction_examples(repo, qualname, module_source=base_source)
+    if examples:
+        yield _event("status", stage="probes",
+                     text=f"found {len(examples)} test(s) that build what "
+                          f"{qualname} needs")
+
     yield _event("status", stage="probes",
                  text=f"asking Nemotron for inputs to {qualname}")
 
@@ -517,6 +527,7 @@ def _probe_and_compare(
                 subclasses=receiver_candidates(base_source, qualname),
                 stateful=is_stateful(base_source, qualname),
                 diff=diff_text,
+                covering_tests=examples,
                 on_progress=lambda **fields: updates.put(fields),
             )
         except BaseException as exc:  # noqa: BLE001 - re-raised on the caller's thread
