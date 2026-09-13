@@ -89,6 +89,7 @@ class Result:
     witnesses: list = field(default_factory=list)
     summary: str = ""
     install_mode: str = ""
+    skipped: list = field(default_factory=list)
     seconds: float = 0.0
     cost: float = 0.0
     detail: str = ""
@@ -204,6 +205,7 @@ def verify(change: remote.Change, result: Result) -> Result:
             kind = event.get("type")
             if kind == "review":
                 result.functions = len(event.get("targets") or [])
+                result.skipped = [s.get("why", "") for s in (event.get("skipped") or [])]
             elif kind == "checkpoint":
                 result.install_mode = event.get("mode", "")
             elif kind == "function":
@@ -234,14 +236,23 @@ def verify(change: remote.Change, result: Result) -> Result:
     if not result.outcome:
         if result.divergences:
             result.outcome = "divergence"
-        elif not result.functions:
-            result.outcome = "no-target"
-        elif not result.probes:
-            result.outcome = "no-probes"
-        elif not saw_target:
-            result.outcome = "no-target"
-        else:
+        elif result.probes and saw_target:
             result.outcome = "preserved"
+        elif saw_target or result.functions:
+            result.outcome = "no-probes"
+        elif not result.skipped:
+            # Nothing in the library changed at all: documentation, packaging,
+            # or a pull request that only deletes code. There is no behaviour
+            # here to preserve or break, and calling this a failure to find a
+            # target blames the tool for the shape of the change.
+            result.outcome = "nothing-to-verify"
+        elif all("added in this change" in why for why in result.skipped):
+            # Every candidate is new. New code has no earlier behaviour to
+            # differ from; this is the one question differential verification
+            # cannot be asked.
+            result.outcome = "new-code"
+        else:
+            result.outcome = "no-target"
     return result
 
 
@@ -304,19 +315,23 @@ def report(results: list[Result], budget: Budget) -> None:
         return
 
     order = ["fix", "no-claim", "feature", "other"]
-    outcomes = ["divergence", "preserved", "no-probes", "no-target", "error", "fetch-failed"]
-    print(f"{'claim':<10}{'n':>4}" + "".join(f"{o[:9]:>11}" for o in outcomes))
-    print("-" * 76)
+    outcomes = ["divergence", "preserved", "no-probes", "no-target",
+                "new-code", "nothing-to-verify", "error", "fetch-failed"]
+    print(f"{'claim':<10}{'n':>4}" + "".join(f"{o[:8]:>10}" for o in outcomes))
+    print("-" * 92)
     for claim in order:
         rows = [r for r in results if r.claim == claim]
         if not rows:
             continue
         counts = [sum(1 for r in rows if r.outcome == o) for o in outcomes]
-        print(f"{claim:<10}{len(rows):>4}" + "".join(f"{c:>11}" for c in counts))
-    print("-" * 76)
+        print(f"{claim:<10}{len(rows):>4}" + "".join(f"{c:>10}" for c in counts))
+    print("-" * 92)
 
+    answerable = [r for r in results
+                  if r.outcome not in ("nothing-to-verify", "new-code", "fetch-failed")]
     verified = [r for r in results if r.outcome in ("divergence", "preserved")]
-    print(f"  reached a verdict            {len(verified)}/{len(results)}")
+    print(f"  had behaviour to check       {len(answerable)}/{len(results)}")
+    print(f"  reached a verdict            {len(verified)}/{len(answerable)}")
     if verified:
         found = [r for r in verified if r.outcome == "divergence"]
         print(f"  behaviour change found       {len(found)}/{len(verified)}")

@@ -17,6 +17,13 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 # Directory names that mean "this is the suite, not the code under test".
 TEST_DIRS = {"test", "tests", "testing", "_test", "_tests"}
 
+# Neither is the packaging and documentation scaffolding. A version bump in
+# setup.py and a Sphinx setting in docs/conf.py are real changes to real Python
+# files, and there is nothing in either one a caller can invoke. Counting them
+# as "MUTINY found no target" blames the tool for the shape of the change.
+NOT_LIBRARY_DIRS = {"docs", "doc", "examples", "example", "benchmark", "benchmarks"}
+NOT_LIBRARY_FILES = {"setup.py", "conf.py", "noxfile.py", "tasks.py", "conftest.py"}
+
 
 def _is_source(path: str) -> bool:
     """Is this a source file we may attack?
@@ -32,12 +39,15 @@ def _is_source(path: str) -> bool:
     if not path.endswith(".py"):
         return False
     parts = Path(path).parts
-    if any(part.lower() in TEST_DIRS for part in parts[:-1]):
+    lowered = [part.lower() for part in parts[:-1]]
+    if any(part in TEST_DIRS for part in lowered):
+        return False
+    if any(part in NOT_LIBRARY_DIRS for part in lowered):
         return False
     name = parts[-1].lower()
-    return not (
-        name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
-    )
+    if name in NOT_LIBRARY_FILES:
+        return False
+    return not (name.startswith("test_") or name.endswith("_test.py"))
 
 
 @dataclass(frozen=True)
@@ -176,11 +186,109 @@ def enclosing_functions(source: str, lines: tuple[int, ...]) -> list[str]:
             if isinstance(child, ast.ClassDef):
                 walk(child, f"{prefix}{child.name}.")
             elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                lo, hi = child.lineno, (child.end_lineno or child.lineno)
-                if any(lo <= n <= hi for n in lines):
-                    found.append((lo, f"{prefix}{child.name}"))
+                if any(_span(child)[0] <= n <= _span(child)[1] for n in lines):
+                    found.append((child.lineno, f"{prefix}{child.name}"))
+                    # Do not descend. A def inside a def cannot be called from
+                    # outside it, so a nested helper is not a probeable target --
+                    # the function that encloses it is. tenacity's `retry.wrap`
+                    # was reported as ambiguous for exactly this reason.
+                    continue
                 walk(child, f"{prefix}{child.name}.")
 
     walk(tree, "")
-    # Innermost wins: a nested helper is more specific than its enclosing method.
     return [name for _, name in sorted(found, key=lambda t: -t[0])]
+
+
+def _span(node) -> tuple[int, int]:
+    """The line range of a definition, decorators included.
+
+    ast puts `lineno` on the `def`, so a change to a decorator sits outside its
+    own function and belongs to nothing. Eight of tenacity's files changed only
+    an `@override` line and every one of them reported no target.
+    """
+    start = node.lineno
+    for decorator in getattr(node, "decorator_list", []):
+        start = min(start, decorator.lineno)
+    return start, (node.end_lineno or node.lineno)
+
+
+def _bound_names(statement) -> set[str]:
+    """The names a statement binds, for assignments in a module or class body."""
+    import ast
+
+    names: set[str] = set()
+    targets: list = []
+    if isinstance(statement, ast.Assign):
+        targets = list(statement.targets)
+    elif isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
+        targets = [statement.target]
+    for target in targets:
+        for node in ast.walk(target):
+            if isinstance(node, ast.Name):
+                names.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.add(node.attr)
+    return names
+
+
+def dependent_functions(source: str, lines: tuple[int, ...], limit: int = 4) -> list[str]:
+    """Functions whose behaviour depends on a change made outside any function.
+
+    A module-level regex, a class attribute, a lookup table: none of these are
+    inside a function, so `enclosing_functions` returns nothing and the change
+    looks unprobeable. It is not — it is just that the thing to run is whatever
+    reads the name that changed.
+
+    semver's "reject non-ASCII digits" edited a module-level pattern. arrow's
+    locale fix edited a dict in a class body. Both change behaviour that a
+    caller can observe, and both reported no target.
+
+    Functions are ranked by how often they mention the changed names, because a
+    function that uses one three times is more likely to be about it than one
+    that mentions it in passing.
+    """
+    import ast
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    touched = set(lines)
+    changed_names: set[str] = set()
+
+    def scan(body, in_class: bool) -> None:
+        for statement in body:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue  # its own lines belong to it, not to the scope
+            if isinstance(statement, ast.ClassDef):
+                scan(statement.body, True)
+                continue
+            lo = statement.lineno
+            hi = statement.end_lineno or lo
+            if any(lo <= n <= hi for n in touched):
+                changed_names.update(_bound_names(statement))
+
+    scan(tree.body, False)
+    if not changed_names:
+        return []
+
+    ranked: list[tuple[int, str]] = []
+
+    def visit(node, prefix: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                visit(child, f"{prefix}{child.name}.")
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                uses = 0
+                for inner in ast.walk(child):
+                    if isinstance(inner, ast.Name) and inner.id in changed_names:
+                        uses += 1
+                    elif isinstance(inner, ast.Attribute) and inner.attr in changed_names:
+                        uses += 1
+                if uses:
+                    ranked.append((uses, f"{prefix}{child.name}"))
+
+    visit(tree, "")
+    ranked.sort(key=lambda pair: -pair[0])
+    return [name for _, name in ranked[:limit]]

@@ -38,9 +38,25 @@ def find_function(
             n for parent in nodes for n in scope(parent)
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name
         ] or matches
+    # A typing.overload stub is a signature, not an implementation: tenacity
+    # declares `retry` four times, three of them `@t.overload` with a body of
+    # `...`. Counting those made the real function ambiguous and unreachable.
+    real = [m for m in matches if not _is_overload(m)]
+    if len(real) == 1:
+        return real[0]
     if len(matches) != 1:
         return None
     return matches[0]
+
+
+def _is_overload(node) -> bool:
+    """Is this a typing.overload signature stub rather than an implementation?"""
+    for decorator in getattr(node, "decorator_list", []):
+        name = (decorator.attr if isinstance(decorator, ast.Attribute)
+                else getattr(decorator, "id", ""))
+        if name == "overload":
+            return True
+    return False
 
 
 def function_span(source: str, name: str) -> tuple[int, int]:

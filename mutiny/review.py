@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .diff import (ChangedFile, changed_between, changed_lines,
-                   enclosing_functions, hunk_between)
+                   dependent_functions, enclosing_functions, hunk_between)
 from .source import function_span
 
 
@@ -32,6 +32,9 @@ class Target:
     changed_in_function: tuple[int, ...]
     base_source: str
     head_source: str
+    # Empty when the change is inside this function. Otherwise it says how the
+    # function was reached -- it reads something that changed around it.
+    via: str = ""
 
     @property
     def label(self) -> str:
@@ -147,18 +150,35 @@ def _plan(
             continue
 
         names = enclosing_functions(head_source, changed.lines)
+        via = ""
         if not names:
-            review.skipped.append((changed.path, "changed lines are not inside a function"))
-            continue
+            # The change is outside any function: a module-level pattern, a
+            # lookup table, a class attribute. Something still reads it.
+            names = dependent_functions(head_source, changed.lines)
+            via = "reads a name that changed around it"
+            if not names:
+                review.skipped.append(
+                    (changed.path,
+                     "changed lines are outside any function and nothing reads them"))
+                continue
 
         for qualname in names[:3]:
             try:
                 lo, hi = function_span(head_source, qualname)
-                function_span(base_source, qualname)
             except ValueError:
                 review.skipped.append(
                     (f"{changed.path}::{qualname}",
-                     "ambiguous or absent in one revision"))
+                     "defined more than once — cannot tell which one changed"))
+                continue
+            try:
+                function_span(base_source, qualname)
+            except ValueError:
+                # New code has no earlier behaviour to differ from. Saying so is
+                # not the same as failing to find a target, and the two were
+                # being reported identically.
+                review.skipped.append(
+                    (f"{changed.path}::{qualname}",
+                     "added in this change — nothing to compare against"))
                 continue
             inside = tuple(n for n in changed.lines if lo <= n <= hi)
             review.targets.append(Target(
@@ -168,6 +188,7 @@ def _plan(
                 changed_in_function=inside or changed.lines,
                 base_source=base_source,
                 head_source=head_source,
+                via=via,
             ))
             if len(review.targets) >= max_targets:
                 return review
