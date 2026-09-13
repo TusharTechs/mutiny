@@ -19,13 +19,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from mutiny.attacks import focused_module
+from mutiny.source import focused_module
 from mutiny.differential import agreement, compare, observe
 from mutiny.coverage import covering_examples, measure
 from mutiny.inputs import generate_validated, receiver_candidates
 from mutiny.models import NemotronClient
 
-CHECKOUTS = Path(__file__).resolve().parents[1] / "phase1" / "checkouts"
+CHECKOUTS = Path(__file__).resolve().parents[1] / "checkouts"
 
 # (repo, commit, import module, qualname, expect divergence, why)
 CASES = [

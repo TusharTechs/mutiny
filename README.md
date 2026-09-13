@@ -171,6 +171,42 @@ below local, and the work is spread across forty isolated machines rather than
 competing on one. That matters twice over, because the code being executed was
 written by a model and should not run on a developer's laptop at all.
 
+## Try it
+
+```bash
+mutiny verify path/to/repo Cache.__setitem__
+```
+
+Nemotron rewrites the function, both versions run on generated inputs inside
+forks of one warm Sandboxes checkpoint, and you get either the input where they
+disagree or a clean bill:
+
+```
+cachetools  src/cachetools/__init__.py  Cache.__setitem__  (cachetools)
+
+rewriting with nemotron-3-super-120b-a12b...
+    -        diffsize = size - self.__size[key]
+    +        old_size = self.__size.get(key, 0)
+    +        needed = size - old_size
+    ...
+warming a sandbox checkpoint...
+  ready in 8.8s, 44 KiB uploaded
+generating probes...
+  10 probes
+running both versions...
+
+Behaviour changed.  5 of 10 probes disagree.
+
+  c = LRUCache(3); c["a"] = "x"; c["b"] = "yy"; (sorted(c.items()), c.currsize, len(c))
+    before: ([('a', 'x'), ('b', 'yy')], 2, 2)
+    after:  AttributeError: '_DefaultSize' object has no attribute 'get'
+
+36.2s, $0.0065
+```
+
+`--local` runs the probes on this machine instead, which is faster for a single
+pass and appropriate only for code you trust.
+
 ## Setup
 
 ```bash
@@ -197,11 +233,13 @@ The benchmarks clone three real repositories and run against their history:
 
 | module | responsibility |
 |---|---|
+| `mutiny/cli.py` | `mutiny verify` — the whole loop in one command |
 | `mutiny/refactor.py` | Nemotron rewrites a function; the rewrite is applied in place |
 | `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |
 | `mutiny/differential.py` | runs both versions, canonicalises observations, compares |
 | `mutiny/coverage.py` | which tests execute which line — steers probes and test selection |
 | `mutiny/diff.py` | changed lines, source-vs-test filtering, enclosing functions |
+| `mutiny/source.py` | locating a function by qualified name, and showing just enough of it |
 | `mutiny/models.py` | Token Factory client: spend cap, ledger, caching, retry |
 | `mutiny/sandbox.py` | the same execution, forked from a warm Sandboxes checkpoint |
 | `mutiny/tls.py` | reactive certificate-trust repair for inspecting proxies |

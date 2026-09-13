@@ -16,7 +16,7 @@ import ast
 import re
 from dataclasses import dataclass
 
-from .attacks import focused_module, function_span
+from .source import focused_module, function_span
 from .models import SUPER, NemotronClient
 
 SYSTEM = """You refactor Python for readability, preserving behaviour exactly.

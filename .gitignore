@@ -6,6 +6,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 experiments/phase1/results/*.json
-experiments/phase1/checkouts/
+experiments/checkouts/
 certs/
 .cache/

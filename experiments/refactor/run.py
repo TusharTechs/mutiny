@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from mutiny import refactor as R
-from mutiny.attacks import focused_module, function_span
+from mutiny.source import focused_module, function_span
 from mutiny.coverage import covering_examples, measure
 from mutiny.differential import compare, observe
 from mutiny.inputs import generate_validated, is_stateful, receiver_candidates
@@ -33,7 +33,7 @@ from mutiny.models import BudgetExceeded, NemotronClient
 from mutiny.runner import PASSED, SELECTION_ERROR, run_pytest
 
 ROOT = Path(__file__).resolve().parent
-CHECKOUTS = ROOT.parent / "phase1" / "checkouts"
+CHECKOUTS = ROOT.parent / "checkouts"
 
 # (repo, source path, module, qualnames)
 TARGETS = [

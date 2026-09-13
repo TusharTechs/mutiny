@@ -145,16 +145,31 @@ class SandboxExecutor:
     def archive_bytes(self) -> int:
         return self._archive_bytes
 
-    def observe(self, module: str, expressions: list[str], timeout: int = 300) -> list[Observation]:
-        """Evaluate expressions in a fork of the warm checkpoint."""
+    def observe(
+        self,
+        module: str,
+        expressions: list[str],
+        timeout: int = 300,
+        overlay: dict[str, bytes] | None = None,
+    ) -> list[Observation]:
+        """Evaluate expressions in a fork of the warm checkpoint.
+
+        `overlay` replaces files inside the fork only. That is how both versions
+        of the code are run without building two checkpoints: one fork takes the
+        repository as installed, the other takes it with the rewritten file laid
+        over the top, and neither can see the other.
+        """
         if self._warm is None:
             raise RuntimeError("call warm() before observe()")
+        files = {"/tmp/driver.py": DRIVER.encode(),
+                 "/tmp/exprs.json": json.dumps(expressions).encode()}
+        for path, content in (overlay or {}).items():
+            files[f"{self.workdir}/{path.lstrip('/')}"] = content
         run = _check(self._warm.run(
             "python",
             args=["/tmp/driver.py", module, "-", "/tmp/exprs.json"],
             cwd=self.workdir,
-            files={"/tmp/driver.py": DRIVER.encode(),
-                   "/tmp/exprs.json": json.dumps(expressions).encode()},
+            files=files,
             env={"PYTHONHASHSEED": "0", "PYTHONDONTWRITEBYTECODE": "1"},
             timeout=timeout,
         ).wait(), "driver")
