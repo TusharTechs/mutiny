@@ -38,6 +38,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from mutiny import remote
+from mutiny.config import github_token
+from mutiny.diff import _is_source
 from mutiny.fetch import FetchError
 from mutiny.session import verify_trees
 
@@ -114,7 +116,7 @@ class Budget:
 
     def __init__(self) -> None:
         self.calls = 0
-        self.authenticated = bool(os.environ.get("GITHUB_TOKEN"))
+        self.authenticated = bool(github_token())
         self.ceiling = 4500 if self.authenticated else 55
 
     def take(self, n: int = 1) -> bool:
@@ -175,7 +177,9 @@ def change_for(repo: str, pr: dict, budget: Budget) -> remote.Change | None:
     merge_base = comparison.get("merge_base_commit", {}).get("sha") or base
     paths = tuple(f["filename"] for f in comparison.get("files", [])
                   if f.get("filename", "").endswith(".py"))
-    if not paths:
+    # A pull request that only touches its own tests has nothing for us to run.
+    # Skipping it here saves warming a sandbox to discover that.
+    if not any(_is_source(p) for p in paths):
         return None
     return remote.Change(owner, name, merge_base, head, paths, pr=pr["number"])
 

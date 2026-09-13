@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import tls
+from .config import github_token
 from .fetch import GITHUB, FetchError, parse
 
 API = "https://api.github.com"
@@ -62,8 +63,7 @@ def _request(url: str, accept: str = "application/vnd.github+json") -> bytes:
     request = urllib.request.Request(url, headers={
         "Accept": accept,
         "User-Agent": AGENT,
-        **({"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}"}
-           if os.environ.get("GITHUB_TOKEN") else {}),
+        **({"Authorization": f"Bearer {token}"} if (token := github_token()) else {}),
     })
     def open_it() -> bytes:
         # The context has to be built per call, from the environment as it

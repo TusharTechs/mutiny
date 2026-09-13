@@ -87,3 +87,9 @@ def apply_tls_trust() -> None:
 
 def have_nebius() -> bool:
     return nebius_api_key(required=False) is not None
+
+
+def github_token() -> str | None:
+    """Optional. Only raises GitHub's rate limit; no scopes are needed."""
+    load_env()
+    return os.environ.get("GITHUB_TOKEN") or None
