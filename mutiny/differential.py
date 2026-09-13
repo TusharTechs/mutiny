@@ -45,7 +45,26 @@ random.seed(0)
 # process. Left alone it makes any object without a custom __repr__ diverge by
 # construction -- three of six apparent detections in one run were nothing but
 # differing addresses.
-_ADDRESS = re.compile(r"(?: at | @ )(?:0x[0-9a-fA-F]+|\d{6,})")
+_ADDRESS = re.compile(
+    # The default repr shape: <pkg.Thing object at 0x7f...>.
+    r"(?: at | @ )(?:0x[0-9a-fA-F]+|\d{6,})"
+    # And the hand-written shape, which the default filter never saw:
+    # tenacity writes <RetryCallState 140737342193440: attempt #0; ...>, where
+    # the id follows the class name directly. A pull request that only added
+    # @override decorators reported eight divergences, every one of them an
+    # address that had shifted because the decorators changed the allocation
+    # order. confirm() could not catch it either: two fresh processes allocate
+    # identically, so the value looked perfectly stable within each version.
+    r"|(?<=<)(?P<cls>[\w.]+)\s+(?:0x[0-9a-fA-F]{6,}|\d{6,})"
+    # A bare hex address anywhere, for reprs that print one without a keyword.
+    r"|0x[0-9a-fA-F]{8,}"
+)
+
+
+def _strip_addresses(text: str) -> str:
+    """Remove anything that is an object identity rather than a value."""
+    return _ADDRESS.sub(
+        lambda m: f"{m.group('cls')} 0xADDR" if m.group("cls") else "", text)
 _OPAQUE = re.compile(r"^<[\w.]+ object>$")
 
 
@@ -72,14 +91,14 @@ def canonical(value, depth=0):
     if isinstance(value, tuple):
         inner = ", ".join(canonical(v, depth + 1) for v in value)
         return f"({inner},)" if len(value) == 1 else f"({inner})"
-    return _ADDRESS.sub("", repr(value))
+    return _strip_addresses(repr(value))
 
 
 def describe(value):
     try:
         text = canonical(value)[:600]
     except Exception:
-        text = _ADDRESS.sub("", repr(value)[:600])
+        text = _strip_addresses(repr(value)[:600])
     return text, bool(_OPAQUE.match(text.strip()))
 
 module_name, out_path = sys.argv[1], sys.argv[2]
@@ -155,7 +174,7 @@ for expr in exprs:
         rec["ok"] = False
         rec["type"] = type(exc).__name__
         rec["error"] = f"{type(exc).__name__}: {exc}"[:400]
-        rec["message"] = _ADDRESS.sub("", " ".join(str(exc).split()))[:300]
+        rec["message"] = _strip_addresses(" ".join(str(exc).split()))[:300]
     except BaseException as exc:
         rec["ok"] = False
         rec["error"] = f"{type(exc).__name__} (fatal)"

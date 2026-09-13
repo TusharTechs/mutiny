@@ -1,0 +1,1060 @@
+[
+  {
+    "repo": "psf/requests",
+    "number": 6963,
+    "title": "fix CVE 2024 47081: manual url parsing leads to netloc credentials leak",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 22.7,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4070,
+    "title": "perf: reduce Console and RichHandler import time by deferring unused imports",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 44,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 42.9,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 3180,
+    "title": "Fix double-width characters disappearing when wrapping",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 9,
+    "witnesses": [
+      {
+        "input": "chop_cells(\"ab\", 2)",
+        "before": "['ba']",
+        "after": "['ab']"
+      },
+      {
+        "input": "chop_cells(\"a\\nb\", 1)",
+        "before": "['b\\n', 'a']",
+        "after": "['a\\n', 'b']"
+      },
+      {
+        "input": "chop_cells(\"ab\", 1)",
+        "before": "['b', 'a']",
+        "after": "['a', 'b']"
+      }
+    ],
+    "summary": "The function now processes the text left\u2011to\u2011right, accumulating each character\u2019s cell width and starting a new line whenever adding the next character would exceed the supplied width, returning the resulting lines in the original order. As a result, outputs that were formerly reversed (e.g., chop_cells(\"ab\",2) \u2192 ['ba']) are now returned in forward order (['ab']), and a width of 0 produces an initial empty line before the first character.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 52.9,
+    "cost": 0.0008,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 1643,
+    "title": "fix detect color",
+    "claim": "fix",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 19.6,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 3845,
+    "title": "Use faster generator for link IDs",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 44,
+    "divergences": 24,
+    "witnesses": [
+      {
+        "input": "s = Style(link=\"http://ex.com\", meta={\"a\":1}); t = s.update_link(link=\"new\"); (t._link, t._link_id, t._meta)",
+        "before": "('new', '403958', b'\\x80\\x04\\x95\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00}\\x94\\x8c\\x01a\\x94K\\x01s.')",
+        "after": "('new', '14167048', b'\\x80\\x04\\x95\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00}\\x94\\x8c\\x01a\\x94K\\x01s.'"
+      },
+      {
+        "input": "s = Style(link=\"http://ex.com\", meta={\"a\":1}); s._color = Color.parse(\"red\"); s._bgcolor = Color.parse(\"blue\"); s._attributes = 0b001; s._set_attribut",
+        "before": "('new', '403958', b'\\x80\\x04\\x95\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00}\\x94\\x8c\\x01a\\x94K\\x01s.', ",
+        "after": "('new', '14167048', b'\\x80\\x04\\x95\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00}\\x94\\x8c\\x01a\\x94K\\x01s.'"
+      },
+      {
+        "input": "s = Style(link=\"http://ex.com\"); t = s.update_link(link=\"new\"); (t._link, t._link_id, t._meta)",
+        "before": "('new', '403958', None)",
+        "after": "('new', '14167048', None)"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\"); c = s.copy(); (c._link, c._link_id)",
+        "before": "('http://example.com', '403958')",
+        "after": "('http://example.com', '14167048')"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\"); c1 = s.copy(); c2 = c1.copy(); (c1._link_id, c2._link_id)",
+        "before": "('403958', '794772')",
+        "after": "('14167048', '14167049')"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\", meta={\"a\":1}); c = s.copy(); d = s.clear_meta_and_links(); (c._link_id, d._link_id)",
+        "before": "('403958', '')",
+        "after": "('14167048', '')"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\"); w = s.without_color; (w.link, w.link_id, w._null)",
+        "before": "('http://example.com', '403958', False)",
+        "after": "('http://example.com', '14167048', False)"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\", bold=True, italic=True); w = s.without_color; (w.link, w.link_id, w.bold, w.italic, w._null)",
+        "before": "('http://example.com', '403958', True, True, False)",
+        "after": "('http://example.com', '14167048', True, True, False)"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\"); w1 = s.without_color; w2 = s.without_color; (w1.link, w1.link_id, w2.link, w2.link_id)",
+        "before": "('http://example.com', '933488', 'http://example.com', '441001')",
+        "after": "('http://example.com', '14167050', 'http://example.com', '14167051')"
+      }
+    ],
+    "summary": "The change replaces the random six\u2011digit number produced by randint(0, 999999) in _link_id with the next value from a module\u2011level counter (_id_generator) that starts at a random 24\u2011bit integer and increments by one on each call. As a result, whenever Style.update_link creates a non\u2011empty _link_id (i.e., when link or meta is truthy), the numeric prefix now rises sequentially (e.g., 14167047, 14167048, \u2026) instead of being a random value between 0 and 999999, while the hash(meta) suffix (if present) stays the same. When link is falsy, _link_id is either empty or just the counter value, following",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 75.5,
+    "cost": 0.0028,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4077,
+    "title": "proxy isatty",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 12.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4079,
+    "title": "Inline table code",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 28.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3780,
+    "title": "Add FAQ entry about `edit()` returning immediately",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 34.0,
+    "cost": 0.0033,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3865,
+    "title": "Fix short help abbreviation",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 20.1,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3851,
+    "title": "Stable",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 29,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 64.5,
+    "cost": 0.0113,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3861,
+    "title": "Move common `help` argument from `Option` and `Argument` to `Parameter`",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 30,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 30.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3800,
+    "title": "Merge main into stable",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 28,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 28.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3858,
+    "title": "Make `click.Path` generic on `path_type`",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 38,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 29.9,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 404,
+    "title": "Update project to use uv for dependency management",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 57.0,
+    "cost": 0.0091,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 405,
+    "title": "drop end of life python versions",
+    "claim": "other",
+    "outcome": "no-target",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "changed lines are outside any function and nothing reads them"
+    ],
+    "seconds": 2.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 406,
+    "title": "remove previously deprecated code",
+    "claim": "no-claim",
+    "outcome": "nothing-to-verify",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [],
+    "seconds": 1.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 413,
+    "title": "Reject negative maxsize in Cache.__init__",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 7,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "LRUCache(maxsize=-1)",
+        "before": "LRUCache({}, maxsize=-1, currsize=0)",
+        "after": "ValueError: maxsize must be non-negative"
+      },
+      {
+        "input": "LRUCache(maxsize=-4, getsizeof=len)",
+        "before": "LRUCache({}, maxsize=-4, currsize=0)",
+        "after": "ValueError: maxsize must be non-negative"
+      }
+    ],
+    "summary": "When Cache.__init__ is called with a negative maxsize value, it now raises ValueError: maxsize must be non\u2011negative instead of creating a cache instance with that negative size.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 25.1,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 408,
+    "title": "Fix Cache.__setitem__ over-evicting when growing an existing key",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 18.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 401,
+    "title": "Reject negative cache item sizes",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 7,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 18.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 479,
+    "title": "Handle malformed collection operands in Version comparisons",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 19.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 480,
+    "title": "Fix bump_build() silently returning an unchanged version for digitless build metadata",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 5,
+    "witnesses": [
+      {
+        "input": "str(Version(1, 2, 3, None, \"alpha\").bump_build())",
+        "before": "'1.2.3+alpha'",
+        "after": "'1.2.3+alpha.0'"
+      },
+      {
+        "input": "str(Version(1, 2, 3, None, \"build.\").bump_build())",
+        "before": "'1.2.3+build.'",
+        "after": "'1.2.3+build..0'"
+      },
+      {
+        "input": "str(Version(1, 2, 3, None, \"build\").bump_build())",
+        "before": "'1.2.3+build'",
+        "after": "'1.2.3+build.0'"
+      }
+    ],
+    "summary": "The bump_build method now guarantees that if the build metadata contains no digits (including an empty string), it appends \u201c.0\u201d after incrementing, whereas previously such builds were left unchanged. For build strings that already contain digits, the behavior is unchanged\u2014the numeric part is incremented as before.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 30.2,
+    "cost": 0.0005,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 478,
+    "title": "Reject non-ASCII digits and trailing newlines in version parsing",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 10,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 36.6,
+    "cost": 0.0041,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 476,
+    "title": "Add optional native parser backend (minimal adapter)",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 9,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 21.3,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 472,
+    "title": "fix(next_version): reset prerelease when token changes (#339)",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 14,
+    "divergences": 4,
+    "witnesses": [
+      {
+        "input": "Version.parse(\"1.0.0-beta.5\").next_version(\"prerelease\", prerelease_token=\"rc\")",
+        "before": "Version(major=1, minor=0, patch=0, prerelease='beta.6', build=None)",
+        "after": "Version(major=1, minor=0, patch=0, prerelease='rc.1', build=None)"
+      },
+      {
+        "input": "Version.parse(\"1.0.0-rc.2\").next_version(\"prerelease\", prerelease_token=\"beta\")",
+        "before": "Version(major=1, minor=0, patch=0, prerelease='rc.3', build=None)",
+        "after": "Version(major=1, minor=0, patch=0, prerelease='beta.1', build=None)"
+      },
+      {
+        "input": "Version.parse(\"1.0.0-beta.2\").next_version(\"prerelease\", prerelease_token=\"rc\")",
+        "before": "Version(major=1, minor=0, patch=0, prerelease='beta.3', build=None)",
+        "after": "Version(major=1, minor=0, patch=0, prerelease='rc.1', build=None)"
+      }
+    ],
+    "summary": "When next_version is called with part=\"prerelease\" and a prerelease_token that differs from the current version\u2019s prerelease token (i.e., version.prerelease is not None and the first token of version.prerelease does not equal prerelease_token), the function now returns a version whose prerelease is set to <prerelease_token>.1 with build cleared, instead of incrementing the numeric suffix of the existing prerelease token as it did before.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 25.8,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 115,
+    "title": "Fix string_to_int radix when alphabet_index is provided",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 12,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "string_to_int(\"010\", ['0','1','2'], {'0':0,'1':1})",
+        "before": "3",
+        "after": "2"
+      },
+      {
+        "input": "string_to_int(\"20\", ['0','1'], {'0':0,'1':1,'2':2})",
+        "before": "4",
+        "after": "6"
+      }
+    ],
+    "summary": "When an alphabet_index is supplied, string_to_int now computes the radix as len(alphabet_index) instead of len(alphabet), so the base used for conversion changes whenever the two lengths differ. Consequently, inputs such as \"010\" with alphabet ['0','1','2'] and index {'0':0,'1':1} yield 2 instead of 3, and \"20\" with alphabet ['0','1'] and index {'0':0,'1':1,'2':2} yield 6 instead of 4.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 27.9,
+    "cost": 0.0007,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 113,
+    "title": "ci: Update workflows for GitHub Actions-supported Python versions and add 3.6+ compatibility check",
+    "claim": "no-claim",
+    "outcome": "error",
+    "functions": 3,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.3,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 114,
+    "title": "perf: Optimize string_to_int and get_alphabet",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 35,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 33.1,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 107,
+    "title": "feat: Allow compatibility with other ShortUUID libraries (#104)",
+    "claim": "feature",
+    "outcome": "error",
+    "functions": 3,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.1,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 103,
+    "title": "fix: Improve randomness (#101)",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 23,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 23.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 95,
+    "title": "fix: annotate *args as Any",
+    "claim": "fix",
+    "outcome": "error",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.7,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 623,
+    "title": "Timezone bugfixes",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 1.4,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 606,
+    "title": "Add support for 3.12",
+    "claim": "feature",
+    "outcome": "no-target",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "changed lines are outside any function and nothing reads them"
+    ],
+    "seconds": 1.8,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 604,
+    "title": "Improved timezones handling in next_run",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 12.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 645,
+    "title": "Respect enabled=False on the direct-call path",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 2,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 12.6,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 696,
+    "title": "fix: read the tornado global live instead of an import-time snapshot",
+    "claim": "fix",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 71.7,
+    "cost": 0.0172,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 694,
+    "title": "fix: restore support for falsy wait values and callable + strategy",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 28.1,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 682,
+    "title": "refactor: mark overridden methods with @override",
+    "claim": "no-claim",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 38,
+    "divergences": 8,
+    "witnesses": [
+      {
+        "input": "rs = RetryCallState(Retrying(), lambda: None, (), {}); rs.attempt_number=0; rs.idle_for=0.0; rs.outcome=None; (repr(rs), rs.attempt_number, rs.idle_fo",
+        "before": "('<RetryCallState 140737342193440: attempt #0; slept for 0.0; last result: none yet>', 0, ",
+        "after": "('<RetryCallState 140737342194608: attempt #0; slept for 0.0; last result: none yet>', 0, "
+      },
+      {
+        "input": "rs = RetryCallState(Retrying(), lambda: None, (), {}); rs.attempt_number=0; rs.idle_for=-0.5; rs.outcome=None; (repr(rs), rs.attempt_number, rs.idle_f",
+        "before": "('<RetryCallState 140737341858176: attempt #0; slept for -0.5; last result: none yet>', 0,",
+        "after": "('<RetryCallState 140737340405472: attempt #0; slept for -0.5; last result: none yet>', 0,"
+      },
+      {
+        "input": "rs = RetryCallState(Retrying(stop=stop_after_attempt(2)), lambda: None, (), {}); rs.attempt_number=1; rs.idle_for=0.0; rs.outcome=None; (repr(rs), rs.",
+        "before": "('<RetryCallState 140737340407056: attempt #1; slept for 0.0; last result: none yet>', 1, ",
+        "after": "('<RetryCallState 140737340405424: attempt #1; slept for 0.0; last result: none yet>', 1, "
+      }
+    ],
+    "summary": "The __repr__ method of RetryCallState now carries an @override decorator but continues to return the same <RetryCallState <id>: attempt #<n>; slept for <idle_for>; last result: none yet> string; the only observable difference is the object's address (<id>) which varies between instances.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 153.4,
+    "cost": 0.028,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 680,
+    "title": "refactor: declare BaseAction's REPR_FIELDS and NAME as ClassVar",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 44.7,
+    "cost": 0.0079,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 679,
+    "title": "refactor: drop always-true truthiness checks and enable truthy-bool",
+    "claim": "no-claim",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 28,
+    "divergences": 4,
+    "witnesses": [
+      {
+        "input": "rs = RetryCallState(retry_object=Retrying(wait=None), fn=lambda: None, args=(), kwargs={}); Retrying(wait=None)._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'NoneType' object is not callable"
+      },
+      {
+        "input": "rs = RetryCallState(retry_object=Retrying(wait=False), fn=lambda: None, args=(), kwargs={}); Retrying(wait=False)._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'bool' object is not callable"
+      },
+      {
+        "input": "rs = RetryCallState(retry_object=Retrying(wait=0), fn=lambda: None, args=(), kwargs={}); Retrying(wait=0)._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'int' object is not callable"
+      }
+    ],
+    "summary": "The function now unconditionally calls self.wait(retry_state) and assigns the result to retry_state.upcoming_sleep. Previously, when self.wait was falsy (e.g., None, False, 0, or an empty list), the function skipped the call and set upcoming_sleep to 0.0. After the change, those same inputs cause a TypeError because the non\u2011callable value is invoked as a function, while callable wait objects continue to behave as before.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 55.7,
+    "cost": 0.0063,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1270,
+    "title": "fix nonpositive item limits in constrained_batches",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 12,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "list(constrained_batches([], 5, max_count=0))",
+        "before": "[]",
+        "after": "ValueError: maximum count must be greater than zero"
+      },
+      {
+        "input": "list(constrained_batches(['a', 'b', 'c', 'd', 'e'], 10, max_count=0))",
+        "before": "[('a', 'b', 'c', 'd', 'e')]",
+        "after": "ValueError: maximum count must be greater than zero"
+      }
+    ],
+    "summary": "If max_count is supplied and is zero or negative, constrained_batches now raises ValueError('maximum count must be greater than zero'), whereas previously it accepted the value and returned batches without enforcing a count limit.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 26.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1266,
+    "title": "Clarify `combination_with_replacement_index` a bit",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 17.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1261,
+    "title": "Fix/simplify `combination_with_replacement_index`",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 20.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1256,
+    "title": "Add missing word \"is\" in docstrings",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 39,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 29.9,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1116,
+    "title": "Issue 1113: Add random ordered combinatoric functions",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 3.4,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1253,
+    "title": "Do not yield an empty list for an empty iterable when maxsplit is 0",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 10,
+    "witnesses": [
+      {
+        "input": "list(split_when([], lambda x, y: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_when([], lambda x, y: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_when(\"\", lambda x, y: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_after([], lambda x: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_after([], lambda n: n%3==0, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_before([], lambda x: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_before([], lambda x: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      }
+    ],
+    "summary": "When maxsplit is 0, split_when now yields the whole iterable as a single sub\u2011list only if the iterable is non\u2011empty; for an empty iterable it yields no output, whereas before it always yielded a single empty list [[]]. This change affects any call with maxsplit=0, regardless of the predicate or the type of the iterable.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 54.8,
+    "cost": 0.0004,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1251,
+    "title": "Issue 1250: don't mask TypeError raised while iterating in value_chain",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 14,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 16.7,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1264,
+    "title": "Revert \"Fix humanize reporting 'a month' for 16-day differences\"",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1242,
+    "title": "Fix humanize reporting 'a month' for 16-day differences",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 1,
+    "witnesses": [
+      {
+        "input": "Arrow(2020,1,1).humanize(Arrow(2020,1,20))",
+        "before": "'a month ago'",
+        "after": "'2 weeks ago'"
+      }
+    ],
+    "summary": "The change prevents rounding up to a month when the elapsed time is more than two weeks but less than a full month and no calendar month has fully passed; instead, it returns a weeks\u2011based description. Consequently, Arrow(2020,1,1).humanize(Arrow(2020,1,20)) now yields '2 weeks ago' rather than 'a month ago'.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 25.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1234,
+    "title": "Added weeks to afrikaans locale",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 9,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 110.8,
+    "cost": 0.0242,
+    "detail": ""
+  }
+]

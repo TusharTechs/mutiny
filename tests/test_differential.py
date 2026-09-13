@@ -1,0 +1,44 @@
+
+
+def driver_namespace():
+    """The driver is a string injected into the sandbox, so it cannot be imported.
+
+    That also meant its canonicalisation — the most correctness-critical code in
+    the project, and the source of five of the six false-finding classes on
+    record — could only ever be tested end to end, through a sandbox. Executing
+    the definitions directly makes them testable in milliseconds.
+    """
+    from mutiny.differential import DRIVER
+
+    namespace: dict = {}
+    # Everything above the argv parsing is pure definitions.
+    definitions = DRIVER[: DRIVER.index("module_name, out_path")]
+    exec(compile(definitions, "<driver>", "exec"), namespace)  # noqa: S102
+    return namespace
+
+
+def test_an_identity_written_without_the_word_at_is_still_an_identity():
+    """tenacity writes <RetryCallState 140737342193440: ...> with no " at ".
+
+    The address filter only matched the default repr shape, so a pull request
+    that did nothing but add @override decorators reported eight divergences —
+    every one an address that shifted because the decorators changed the
+    allocation order. confirm() could not catch it: two fresh processes allocate
+    identically, so the value looked stable within each version and different
+    between them.
+    """
+    strip = driver_namespace()["_strip_addresses"]
+
+    before = "<RetryCallState 140737342193440: attempt #0; slept for 0.0>"
+    after = "<RetryCallState 140737342194608: attempt #0; slept for 0.0>"
+    assert strip(before) == strip(after)
+    assert strip(before).startswith("<RetryCallState 0xADDR")
+
+
+def test_stripping_identities_does_not_swallow_values():
+    strip = driver_namespace()["_strip_addresses"]
+
+    assert strip("<X 140737342193440: n=1>") != strip("<X 140737342193440: n=2>")
+    assert strip("Point(x=42, y=7)") == "Point(x=42, y=7)"
+    assert strip("Row(id=123456, name='a')") == "Row(id=123456, name='a')"
+    assert strip("<mutiny.Thing object at 0x7f9a1b2c3d4e>") == "<mutiny.Thing object>"
