@@ -22,15 +22,28 @@ disagree with any particular call.
 ## Results
 
     claim        n  divergence preserved no-probes no-target new-code nothing- error
-    fix         15          6         5         2        0        0        0      2
-    no-claim     7          1         4         0        0        0        1      1
+    fix         15          6         7         1        0        0        0      1
+    no-claim     7          2         3         0        0        0        1      1
     feature      5          0         3         0        1        0        0      1
-    other       22          3        11         4        1        3        0      0
+    other       22          4        11         3        1        3        0      0
 
     had behaviour to check      45/49
-    reached a verdict           33/45
-    behaviour change found      10/33
-    spend                       $0.26 for the corpus
+    reached a verdict           36/45
+    behaviour change found      12/36
+    spend                       $0.39 for the corpus
+
+Verdict coverage over the three rounds of work this corpus drove:
+
+    28/53    at first run
+    33/45    after target selection reached changes outside a function
+    36/45    after the probe generator was shown the repository's own tests
+
+The two "no-claim" rows are **one distinct change**. `jd/tenacity#680` is
+stacked on `#679` — its branch contains both commits and they merged 51 seconds
+apart — so the merge base legitimately predates both and the same removed guard
+is reported against each. That is correct: a reviewer opening #680 sees #679's
+commit in the branch too. It is not two independent findings, and counting it as
+two would be wrong.
 
 Four of the 49 had no behaviour to check at all: three added only new code, and
 one changed no library source. Those are not failures to find anything — they

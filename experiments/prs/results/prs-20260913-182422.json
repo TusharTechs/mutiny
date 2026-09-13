@@ -1,0 +1,1061 @@
+[
+  {
+    "repo": "psf/requests",
+    "number": 6963,
+    "title": "fix CVE 2024 47081: manual url parsing leads to netloc credentials leak",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 27.6,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4070,
+    "title": "perf: reduce Console and RichHandler import time by deferring unused imports",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 112.3,
+    "cost": 0.0174,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 3180,
+    "title": "Fix double-width characters disappearing when wrapping",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 9,
+    "witnesses": [
+      {
+        "input": "chop_cells(\"e\\u0301\", 1)",
+        "before": "['\u0301e']",
+        "after": "['e\u0301']"
+      },
+      {
+        "input": "chop_cells(\"e\\u0301\", 0)",
+        "before": "['\u0301', 'e']",
+        "after": "['', 'e', '\u0301']"
+      },
+      {
+        "input": "chop_cells(\"ab\", 2)",
+        "before": "['ba']",
+        "after": "['ab']"
+      }
+    ],
+    "summary": "Before the change, chop_cells iterated over the text in reverse, accumulating characters so that each returned line\u2014and the order of the lines themselves\u2014were the opposite of their appearance in the input. After the change, it scans the text left\u2011to\u2011right, uses the width argument directly (no position offset), and returns the lines in the same order as they occur in the original string.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 77.2,
+    "cost": 0.0038,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 1643,
+    "title": "fix detect color",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 14,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 61.5,
+    "cost": 0.0086,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 3845,
+    "title": "Use faster generator for link IDs",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 13,
+    "witnesses": [
+      {
+        "input": "(s := Style(color=\"red\", bgcolor=\"blue\", bold=True).update_link(link=\"x\")) and (s._color, s._bgcolor, s._attributes, s._set_attributes, s._link, s._li",
+        "before": "(('red', ColorType.STANDARD, 1, None), ('blue', ColorType.STANDARD, 4, None), 1, 1, 'x', '",
+        "after": "(('red', ColorType.STANDARD, 1, None), ('blue', ColorType.STANDARD, 4, None), 1, 1, 'x', '"
+      },
+      {
+        "input": "(orig := dumps({\"test\":1})) and (s := Style(meta={\"test\":1}).update_link(link=\"x\")) and (s._link, s._link_id, s._meta == orig)",
+        "before": "('x', '403958', True)",
+        "after": "('x', '14167048', True)"
+      },
+      {
+        "input": "(s1 := Style().update_link(link=\"a\")) and (s2 := s1.update_link(link=\"b\")) and (int(s1._link_id), int(s2._link_id))",
+        "before": "(885440, 403958)",
+        "after": "(14167047, 14167048)"
+      },
+      {
+        "input": "s = Style(color=\"red\", bgcolor=\"black\", bold=True, dim=True, italic=True, underline=True, blink=True, blink2=True, reverse=True, conceal=True, strike=",
+        "before": "(False, None, None, ('red', ColorType.STANDARD, 1, None), ('black', ColorType.STANDARD, 0,",
+        "after": "(False, None, None, ('red', ColorType.STANDARD, 1, None), ('black', ColorType.STANDARD, 0,"
+      },
+      {
+        "input": "s = Style(link=\"http://example.com\", meta=None); copy_s = s.copy(); (copy_s._null, copy_s._ansi, copy_s._style_definition, copy_s._color, copy_s._bgco",
+        "before": "(False, None, None, None, None, 0, 0, 'http://example.com', '403958', None, None)",
+        "after": "(False, None, None, None, None, 0, 0, 'http://example.com', '14167048', None, None)"
+      },
+      {
+        "input": "s = Style(color=\"red\", link=\"http://example.com\", bold=True, italic=True); copy_s = s.copy(); (copy_s._null, copy_s._ansi, copy_s._style_definition, c",
+        "before": "(False, None, None, ('red', ColorType.STANDARD, 1, None), None, 5, 5, 'http://example.com'",
+        "after": "(False, None, None, ('red', ColorType.STANDARD, 1, None), None, 5, 5, 'http://example.com'"
+      }
+    ],
+    "summary": "The change replaces the random six\u2011digit number (randint(0, 999999)) used to build _link_id with a value taken from a global count generator that starts at a random 24\u2011bit seed and increments by one on each call; when meta is present the same hash(self._meta) suffix is still appended, otherwise the _link_id consists solely of the incrementing integer. Consequently, successive invocations of Style.update_link now produce _link_id values that form a steadily increasing sequence (e.g., 14167047, 14167048, \u2026) instead of independent pseudo\u2011random numbers in the range 0\u2011999999, while calls without a",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 141.3,
+    "cost": 0.0203,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4077,
+    "title": "proxy isatty",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 14.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 4079,
+    "title": "Inline table code",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 29.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3780,
+    "title": "Add FAQ entry about `edit()` returning immediately",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 22.3,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3865,
+    "title": "Fix short help abbreviation",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 29.7,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3851,
+    "title": "Stable",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 28,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 133.6,
+    "cost": 0.0248,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3861,
+    "title": "Move common `help` argument from `Option` and `Argument` to `Parameter`",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 36,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 85.8,
+    "cost": 0.0127,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3800,
+    "title": "Merge main into stable",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 16,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 79.5,
+    "cost": 0.0125,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/click",
+    "number": 3858,
+    "title": "Make `click.Path` generic on `path_type`",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 35,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 153.6,
+    "cost": 0.0217,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 404,
+    "title": "Update project to use uv for dependency management",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 9,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 44.9,
+    "cost": 0.0048,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 405,
+    "title": "drop end of life python versions",
+    "claim": "other",
+    "outcome": "no-target",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "changed lines are outside any function and nothing reads them"
+    ],
+    "seconds": 3.2,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "pallets/itsdangerous",
+    "number": 406,
+    "title": "remove previously deprecated code",
+    "claim": "no-claim",
+    "outcome": "nothing-to-verify",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [],
+    "seconds": 2.5,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 413,
+    "title": "Reject negative maxsize in Cache.__init__",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 7,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "LRUCache(maxsize=-1)",
+        "before": "LRUCache({}, maxsize=-1, currsize=0)",
+        "after": "ValueError: maxsize must be non-negative"
+      },
+      {
+        "input": "LRUCache(maxsize=-4, getsizeof=len)",
+        "before": "LRUCache({}, maxsize=-4, currsize=0)",
+        "after": "ValueError: maxsize must be non-negative"
+      }
+    ],
+    "summary": "When Cache.__init__ is called with a negative maxsize value, it now raises ValueError: maxsize must be non\u2011negative instead of creating a cache instance with that negative size.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 31.4,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 408,
+    "title": "Fix Cache.__setitem__ over-evicting when growing an existing key",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 19.9,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "tkem/cachetools",
+    "number": 401,
+    "title": "Reject negative cache item sizes",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 7,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 19.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 479,
+    "title": "Handle malformed collection operands in Version comparisons",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 13,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 20.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 480,
+    "title": "Fix bump_build() silently returning an unchanged version for digitless build metadata",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 4,
+    "witnesses": [
+      {
+        "input": "Version(1,0,0,build=\"build\").bump_build().build",
+        "before": "'build'",
+        "after": "'build.0'"
+      },
+      {
+        "input": "Version(1,0,0,build=\"alpha\").bump_build().build",
+        "before": "'alpha'",
+        "after": "'alpha.0'"
+      },
+      {
+        "input": "Version(1,0,0,build=\"rc\").bump_build().build",
+        "before": "'rc'",
+        "after": "'rc.0'"
+      }
+    ],
+    "summary": "When bump_build() is called on a version whose build string contains no digits (including an empty string), the method now appends \u201c.0\u201d after attempting to increment the string, whereas before it left the build string unchanged.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 42.2,
+    "cost": 0.0029,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 478,
+    "title": "Reject non-ASCII digits and trailing newlines in version parsing",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 7,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 53.0,
+    "cost": 0.0105,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 476,
+    "title": "Add optional native parser backend (minimal adapter)",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 9,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 31.9,
+    "cost": 0.0029,
+    "detail": ""
+  },
+  {
+    "repo": "python-semver/python-semver",
+    "number": 472,
+    "title": "fix(next_version): reset prerelease when token changes (#339)",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 3,
+    "witnesses": [
+      {
+        "input": "v = Version(1,2,3,prerelease='rc.9', build='1'); nv = v.next_version('prerelease', 'beta'); (nv.major, nv.minor, nv.patch, nv.prerelease, nv.build)",
+        "before": "(1, 2, 3, 'rc.10', None)",
+        "after": "(1, 2, 3, 'beta.1', None)"
+      },
+      {
+        "input": "v = Version(1,2,3,prerelease='beta.5', build='abc'); nv = v.next_version('prerelease'); (nv.major, nv.minor, nv.patch, nv.prerelease, nv.build)",
+        "before": "(1, 2, 3, 'beta.6', None)",
+        "after": "(1, 2, 3, 'rc.1', None)"
+      },
+      {
+        "input": "v = Version(1,2,3,prerelease='.rc.2'); nv = v.next_version('prerelease'); (nv.major, nv.minor, nv.patch, nv.prerelease, nv.build)",
+        "before": "(1, 2, 3, '.rc.3', None)",
+        "after": "(1, 2, 3, 'rc.1', None)"
+      }
+    ],
+    "summary": "When next_version is called for the prerelease part with a prerelease_token that differs from the current prerelease\u2019s leading token (e.g., current 'rc.9' with token 'beta'), the function now returns a version whose prerelease is set to '<token>.1' and build cleared, whereas previously it incremented the existing prerelease\u2019s numeric part (rc.9 \u2192 rc.10). When no prerelease_token is supplied, the function now returns a version with prerelease 'rc.1' and build cleared (e.g., '.rc.2' \u2192 'rc.1'), instead of incrementing the existing prerelease\u2019s numeric part while preserving any leading dot.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 52.1,
+    "cost": 0.0062,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 115,
+    "title": "Fix string_to_int radix when alphabet_index is provided",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 12,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "string_to_int(\"010\", ['0','1','2'], {'0':0,'1':1})",
+        "before": "3",
+        "after": "2"
+      },
+      {
+        "input": "string_to_int(\"20\", ['0','1'], {'0':0,'1':1,'2':2})",
+        "before": "4",
+        "after": "6"
+      }
+    ],
+    "summary": "When an alphabet_index is supplied, string_to_int now computes the radix as len(alphabet_index) instead of len(alphabet), so the base used for conversion changes whenever the two lengths differ. Consequently, inputs such as \"010\" with alphabet ['0','1','2'] and index {'0':0,'1':1} yield 2 instead of 3, and \"20\" with alphabet ['0','1'] and index {'0':0,'1':1,'2':2} yield 6 instead of 4.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 29.0,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 113,
+    "title": "ci: Update workflows for GitHub Actions-supported Python versions and add 3.6+ compatibility check",
+    "claim": "no-claim",
+    "outcome": "error",
+    "functions": 3,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.3,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 114,
+    "title": "perf: Optimize string_to_int and get_alphabet",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 34,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 85.8,
+    "cost": 0.0175,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 107,
+    "title": "feat: Allow compatibility with other ShortUUID libraries (#104)",
+    "claim": "feature",
+    "outcome": "error",
+    "functions": 3,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.8,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 103,
+    "title": "fix: Improve randomness (#101)",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 8,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 54.1,
+    "cost": 0.0081,
+    "detail": ""
+  },
+  {
+    "repo": "skorokithakis/shortuuid",
+    "number": 95,
+    "title": "fix: annotate *args as Any",
+    "claim": "fix",
+    "outcome": "error",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 11.0,
+    "cost": 0.0,
+    "detail": "RuntimeError: driver failed (exit 1): line 1331, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 935, in _load_unlocked\n  File \"<frozen "
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 623,
+    "title": "Timezone bugfixes",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 1.4,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 606,
+    "title": "Add support for 3.12",
+    "claim": "feature",
+    "outcome": "no-target",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "changed lines are outside any function and nothing reads them"
+    ],
+    "seconds": 1.3,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "dbader/schedule",
+    "number": 604,
+    "title": "Improved timezones handling in next_run",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 69.8,
+    "cost": 0.0185,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 645,
+    "title": "Respect enabled=False on the direct-call path",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 2,
+    "probes": 11,
+    "divergences": 2,
+    "witnesses": [
+      {
+        "input": "_s=[0];f=lambda _s=[0]:(_s.__setitem__(0,_s[0]+1),42 if _s[0]==2 else 1/0)[1];r=Retrying(stop=stop_after_attempt(2),retry=retry_if_exception_type(Zero",
+        "before": "42",
+        "after": "ZeroDivisionError: division by zero"
+      },
+      {
+        "input": "_c=[0];f=lambda _c=[0]:(_c.__setitem__(0,_c[0]+1),[0,1][_c[0]-1])[1];r=Retrying(stop=stop_after_attempt(5),retry=retry_if_result(lambda x:x==0),enable",
+        "before": "(1, 0)",
+        "after": "(0, 0)"
+      }
+    ],
+    "summary": "When Retrying.enabled is False, __call__ now returns fn(*args, **kwargs) directly, bypassing the retry loop; previously it would still enter the retry loop and could retry the call according to the stop and retry conditions. This is evident in the first example, where a disabled Retrying that would have retried a ZeroDivisionError now propagates the exception, and in the second example, where a disabled Retrying that would have retried until a non\u2011zero result now returns the first attempt's value.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 88.6,
+    "cost": 0.0169,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 696,
+    "title": "fix: read the tornado global live instead of an import-time snapshot",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 1,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 39.3,
+    "cost": 0.0047,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 694,
+    "title": "fix: restore support for falsy wait values and callable + strategy",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 18,
+    "divergences": 1,
+    "witnesses": [
+      {
+        "input": "wait_combine()( {} )",
+        "before": "0",
+        "after": "0.0"
+      }
+    ],
+    "summary": "The __call__ method now converts the summed wait time to a float, so when the combined strategies produce a total of zero (e.g., when no strategies are present), the return value changes from the integer 0 to the floating\u2011point value 0.0.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 144.2,
+    "cost": 0.0289,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 682,
+    "title": "refactor: mark overridden methods with @override",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 30,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 138.2,
+    "cost": 0.0327,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 680,
+    "title": "refactor: declare BaseAction's REPR_FIELDS and NAME as ClassVar",
+    "claim": "no-claim",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 13,
+    "divergences": 3,
+    "witnesses": [
+      {
+        "input": "r = Retrying(wait=False); rs = RetryCallState(r, None, (), {}); r._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'bool' object is not callable"
+      },
+      {
+        "input": "r = Retrying(wait=None); rs = RetryCallState(r, None, (), {}); r._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'NoneType' object is not callable"
+      },
+      {
+        "input": "r = Retrying(wait=0); rs = RetryCallState(r, None, (), {}); r._run_wait(rs); rs.upcoming_sleep",
+        "before": "0.0",
+        "after": "TypeError: 'int' object is not callable"
+      }
+    ],
+    "summary": "The _run_wait method now always attempts to call self.wait(retry_state) instead of first checking whether self.wait is truthy, so when self.wait is a falsy non\u2011callable value such as False, None, or 0 it raises TypeError rather than setting upcoming_sleep to 0.0. For callable wait arguments the behavior remains unchanged.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 148.1,
+    "cost": 0.0332,
+    "detail": ""
+  },
+  {
+    "repo": "jd/tenacity",
+    "number": 679,
+    "title": "refactor: drop always-true truthiness checks and enable truthy-bool",
+    "claim": "no-claim",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 10,
+    "divergences": 4,
+    "witnesses": [
+      {
+        "input": "r = Retrying(wait=None); rs = RetryCallState(r, None, (), {}); r._run_wait(rs)",
+        "before": "None",
+        "after": "TypeError: 'NoneType' object is not callable"
+      },
+      {
+        "input": "r = Retrying(wait=False); rs = RetryCallState(r, None, (), {}); r._run_wait(rs)",
+        "before": "None",
+        "after": "TypeError: 'bool' object is not callable"
+      },
+      {
+        "input": "r = Retrying(wait=0); rs = RetryCallState(r, None, (), {}); r._run_wait(rs)",
+        "before": "None",
+        "after": "TypeError: 'int' object is not callable"
+      }
+    ],
+    "summary": "When self.wait is not a callable (e.g., None, False, 0, or []), _run_wait previously set upcoming_sleep to 0.0; after the change it attempts to call self.wait(retry_state) and raises a TypeError because the attribute is not callable. If self.wait is a callable, the behavior is unchanged.",
+    "install_mode": "source only",
+    "skipped": [],
+    "seconds": 126.6,
+    "cost": 0.0276,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1270,
+    "title": "fix nonpositive item limits in constrained_batches",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 1,
+    "probes": 12,
+    "divergences": 1,
+    "witnesses": [
+      {
+        "input": "list(constrained_batches([], 5, max_count=0))",
+        "before": "[]",
+        "after": "ValueError: maximum count must be greater than zero"
+      }
+    ],
+    "summary": "When max_count is supplied and is less than or equal to zero, constrained_batches now raises a ValueError with the message \u201cmaximum count must be greater than zero\u201d, whereas previously it would silently produce an empty batch list. This change affects calls such as constrained_batches([], 5, max_count=0), which previously returned [] and now raises the exception.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 40.6,
+    "cost": 0.0022,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1266,
+    "title": "Clarify `combination_with_replacement_index` a bit",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 12,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 28.5,
+    "cost": 0.0031,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1261,
+    "title": "Fix/simplify `combination_with_replacement_index`",
+    "claim": "fix",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 10,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 26.2,
+    "cost": 0.0023,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1256,
+    "title": "Add missing word \"is\" in docstrings",
+    "claim": "feature",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 42,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 60.7,
+    "cost": 0.0082,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1116,
+    "title": "Issue 1113: Add random ordered combinatoric functions",
+    "claim": "other",
+    "outcome": "new-code",
+    "functions": 0,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "",
+    "skipped": [
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against",
+      "added in this change \u2014 nothing to compare against"
+    ],
+    "seconds": 2.9,
+    "cost": 0.0,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1253,
+    "title": "Do not yield an empty list for an empty iterable when maxsplit is 0",
+    "claim": "other",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 44,
+    "divergences": 12,
+    "witnesses": [
+      {
+        "input": "list(split_when([], lambda a,b: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_when([], lambda a,b: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_when((x for x in []), lambda a,b: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_after([], lambda x: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_after('', lambda c: c.isdigit(), maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_after([], lambda x: False, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_before([], lambda _: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_before((x for x in []), lambda _: True, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      },
+      {
+        "input": "list(split_before([], lambda x: x==0, maxsplit=0))",
+        "before": "[[]]",
+        "after": "[]"
+      }
+    ],
+    "summary": "When maxsplit==0 and the input iterable is empty, split_when now yields nothing instead of yielding a single empty list ([[]]). For non\u2011empty iterables the behavior is unchanged: it still yields the whole iterable as one list.",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 164.5,
+    "cost": 0.0071,
+    "detail": ""
+  },
+  {
+    "repo": "more-itertools/more-itertools",
+    "number": 1251,
+    "title": "Issue 1250: don't mask TypeError raised while iterating in value_chain",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 1,
+    "probes": 15,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 27.0,
+    "cost": 0.0026,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1264,
+    "title": "Revert \"Fix humanize reporting 'a month' for 16-day differences\"",
+    "claim": "other",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 68.0,
+    "cost": 0.0179,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1242,
+    "title": "Fix humanize reporting 'a month' for 16-day differences",
+    "claim": "fix",
+    "outcome": "no-probes",
+    "functions": 1,
+    "probes": 0,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 44.6,
+    "cost": 0.0115,
+    "detail": ""
+  },
+  {
+    "repo": "arrow-py/arrow",
+    "number": 1234,
+    "title": "Added weeks to afrikaans locale",
+    "claim": "other",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 9,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "skipped": [],
+    "seconds": 31.2,
+    "cost": 0.0,
+    "detail": ""
+  }
+]
