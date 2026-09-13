@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from mutiny.sandbox import available
-from mutiny.session import verify_diff, verify_function
+from mutiny.session import verify_diff, verify_function, verify_url
 
 ROOT = Path(__file__).resolve().parent
 CHECKOUTS = ROOT.parent / "experiments" / "checkouts"
@@ -83,6 +83,62 @@ def examples() -> dict:
         ],
         "sandboxes": {"available": ok, "detail": why},
     }
+
+
+async def _stream_events(make_events):
+    """Bridge a synchronous generator onto the event loop.
+
+    The run is blocking and long, so it goes to a worker thread and events come
+    back through a queue; otherwise the first sandbox call would stall every
+    other request on the server.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def produce() -> None:
+        try:
+            for event in make_events():
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+        except Exception as exc:  # noqa: BLE001 - surface it rather than hanging
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"type": "error", "message": f"{type(exc).__name__}: {exc}"[:300]})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    loop.run_in_executor(None, produce)
+    while True:
+        event = await queue.get()
+        if event is None:
+            yield "event: end\ndata: {}\n\n"
+            return
+        yield f"data: {json.dumps(event)}\n\n"
+
+
+@app.get("/api/run-url")
+async def run_url(url: str, probes: int = 20, forks: int = 8):
+    """Verify a GitHub repository or pull request the visitor supplies.
+
+    Only github.com is accepted, the clone is size-capped, and the repository is
+    installed and executed inside a sandbox rather than on this machine — which
+    is the reason the sandbox exists.
+    """
+    from mutiny.fetch import FetchError, parse
+
+    try:
+        parse(url)
+    except FetchError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    def events():
+        yield {"type": "status", "stage": "fetch", "text": "fetching from GitHub"}
+        yield from verify_url(url, probes=min(probes, 40), forks=min(forks, 16))
+
+    return StreamingResponse(
+        _stream_events(events),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 async def _stream(example: dict, probes: int, forks: int):

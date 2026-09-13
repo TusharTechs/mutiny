@@ -23,8 +23,25 @@
 </header>
 
 <main class="wrap">
+  <section class="urlbar" aria-label="Verify your own code">
+    <h2 class="eyebrow">Point it at your own code</h2>
+    <form class="url-form" id="url-form">
+      <input id="url-input" type="url" spellcheck="false" autocomplete="off"
+             placeholder="https://github.com/owner/repo/pull/123"
+             aria-label="GitHub repository or pull request URL">
+      <button type="submit" id="url-go">Verify</button>
+    </form>
+    <p class="url-note">
+      A pull request is checked against its merge base. A repository with no
+      change to review gets its most heavily branched function rewritten, and
+      that rewrite checked. Public GitHub repositories only; the code is
+      installed and run inside a sandbox, never on the server.
+    </p>
+    <p class="url-error" id="url-error" hidden></p>
+  </section>
+
   <section class="picker" aria-label="Examples">
-    <h2 class="eyebrow">Pick something to verify</h2>
+    <h2 class="eyebrow">Or try one of these</h2>
     <div class="cards" id="cards"></div>
   </section>
 

@@ -117,22 +117,36 @@ function renderVerdict(e) {
   box.hidden = false;
 }
 
-function start(id, button) {
+function begin(url, button) {
   if (stream) stream.close();
   for (const b of document.querySelectorAll(".card")) {
     b.setAttribute("aria-pressed", String(b === button));
     b.disabled = true;
   }
+  $("url-go").disabled = true;
+  $("url-error").hidden = true;
   $("run").hidden = false;
   $("run-header").replaceChildren();
   $("results").replaceChildren();
   $("verdict").hidden = true;
   $("diff-panel").hidden = true;
   resetForks();
+  return new EventSource(url);
+}
+
+function startUrl(url) {
+  const source = begin(`/api/run-url?url=${encodeURIComponent(url)}`, null);
+  wire(source);
+}
+
+function start(id, button) {
+  wire(begin(`/api/run/${encodeURIComponent(id)}`, button));
+}
+
+function wire(source) {
+  stream = source;
   const state = {};
   setStages(state);
-
-  stream = new EventSource(`/api/run/${encodeURIComponent(id)}`);
   let lastSide = null;
   let currentFunction = null;
 
@@ -174,7 +188,13 @@ function start(id, button) {
         $("results").appendChild(el("p", "agreed",
           `No usable probes were generated for ${e.function}.`));
         break;
+      case "fetched":
+        runHeader([{ text: e.pull_request ? "pull request" : "repository" },
+                   { text: e.slug, strong: true }]);
+        break;
       case "error":
+        $("url-error").textContent = e.message;
+        $("url-error").hidden = false;
         $("results").appendChild(el("p", "agreed", e.message));
         break;
     }
@@ -184,6 +204,7 @@ function start(id, button) {
     if (stream) stream.close();
     stream = null;
     for (const b of document.querySelectorAll(".card")) b.disabled = false;
+    $("url-go").disabled = false;
   };
   stream.addEventListener("end", finish);
   stream.onerror = finish;
@@ -198,6 +219,12 @@ async function boot() {
     ? `sandboxes ready · ${data.sandboxes.detail}`
     : "sandboxes unavailable";
   badge.className = "badge " + (data.sandboxes.available ? "ok" : "bad");
+
+  $("url-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const url = $("url-input").value.trim();
+    if (url) startUrl(url);
+  });
 
   const cards = $("cards");
   cards.replaceChildren();

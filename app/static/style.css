@@ -65,6 +65,37 @@ body {
 .badge.bad { color: var(--warn); border-color: #3a2f16; }
 .badge.quiet { color: var(--faint); }
 
+/* ---------- url bar ---------- */
+.urlbar { margin-top: 4px; }
+.url-form { display: flex; gap: 9px; flex-wrap: wrap; }
+#url-input {
+  flex: 1 1 360px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 11px 13px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13.5px;
+}
+#url-input::placeholder { color: var(--faint); }
+#url-input:focus { outline: none; border-color: var(--accent); }
+#url-go {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 11px 22px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+#url-go:hover:not(:disabled) { background: #17302e; }
+#url-go:disabled { opacity: .45; cursor: default; }
+.url-note { margin: 11px 0 0; color: var(--faint); font-size: 12.5px; max-width: 64ch; }
+.url-error { margin: 10px 0 0; color: var(--fail); font-size: 13px; font-family: var(--mono); }
+
 /* ---------- picker ---------- */
 .eyebrow {
   font-family: var(--mono);

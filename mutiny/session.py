@@ -21,6 +21,7 @@ from . import refactor as refactor_mod
 from . import review as review_mod
 from .differential import Observation, compare, confirm
 from .explain import explain
+from .fetch import FetchError, cleanup, fetch
 from .differential import observe as local_observe
 from .inputs import generate_validated, is_stateful, receiver_candidates
 from .models import NemotronClient
@@ -229,6 +230,83 @@ def verify_diff(
     yield _event("verdict", changed=bool(findings), functions=len(review.targets),
                  findings=findings, seconds=round(time.monotonic() - started, 1),
                  cost=round(client.ledger.total_usd - opening, 4))
+
+
+def verify_url(
+    url: str,
+    *,
+    probes: int = 30,
+    forks: int = 8,
+    cap: float = 5.0,
+    max_functions: int = 6,
+    keep: bool = False,
+) -> Iterator[Event]:
+    """Verify whatever a GitHub URL points at.
+
+    A pull request is checked against its merge base. A plain repository has no
+    change to review, so the most heavily branched function is rewritten and that
+    rewrite is checked instead — which is the same question asked of code the
+    visitor chose rather than code we chose.
+    """
+    yield _event("status", stage="fetch", text=f"fetching {url}")
+    try:
+        source = fetch(url)
+    except FetchError as exc:
+        yield _event("error", message=str(exc))
+        return
+
+    yield _event("fetched", slug=source.slug, pull_request=source.is_pull_request)
+    try:
+        if source.is_pull_request:
+            yield from verify_diff(source.path, source.base, source.head,
+                                   probes=probes, forks=forks, cap=cap,
+                                   max_functions=max_functions)
+        else:
+            target = _busiest_function(source.path)
+            if target is None:
+                yield _event("error",
+                             message=f"no function in {source.slug} was suitable to rewrite")
+                return
+            yield from verify_function(source.path, target, probes=probes,
+                                       forks=forks, cap=cap)
+    finally:
+        if not keep:
+            cleanup(source)
+
+
+def _busiest_function(repo: Path, ceiling: int = 70) -> str | None:
+    """The most heavily branched function, as something worth rewriting."""
+    import ast
+
+    skip = {".git", ".venv", "tests", "test", "build", "dist", "docs", "examples"}
+    best: tuple[int, str] | None = None
+    for path in sorted(repo.rglob("*.py")):
+        rel = path.relative_to(repo)
+        if skip & set(rel.parts) or rel.name.startswith(("test_", "setup", "conf")):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+
+        def consider(node, qualname: str) -> None:
+            nonlocal best
+            lines = (node.end_lineno or node.lineno) - node.lineno
+            if not (5 <= lines <= ceiling):
+                return
+            branches = sum(1 for n in ast.walk(node)
+                           if isinstance(n, (ast.If, ast.For, ast.While, ast.Try)))
+            if branches and (best is None or branches > best[0]):
+                best = (branches, qualname)
+
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                consider(node, node.name)
+            elif isinstance(node, ast.ClassDef):
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        consider(child, f"{node.name}.{child.name}")
+    return best[1] if best else None
 
 
 def _probe_and_compare(

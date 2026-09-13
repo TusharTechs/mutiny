@@ -233,6 +233,22 @@ Version.next_version  src/semver/version.py
 28.4s, $0.0070
 ```
 
+## Point it at your own code
+
+```bash
+mutiny verify-url https://github.com/owner/repo/pull/123
+mutiny verify-url https://github.com/owner/repo
+```
+
+A pull request is checked against its merge base, so other people's work on main
+is not attributed to the change under review. A repository with no change to
+review has its most heavily branched function rewritten, and that rewrite
+checked.
+
+Only public GitHub repositories, the clone is size-capped, and nothing is
+installed or executed on the machine running MUTINY — that happens inside a
+sandbox, which is the reason the sandbox is there.
+
 ## The web interface
 
 ```bash
@@ -280,6 +296,7 @@ The benchmarks clone three real repositories and run against their history:
 | `mutiny/cli.py` | terminal rendering of that stream |
 | `mutiny/review.py` | resolving a branch or commit into changed functions |
 | `mutiny/explain.py` | Nemotron describes the change, grounded in the witnesses |
+| `mutiny/fetch.py` | a GitHub URL becomes a working copy, and a PR its merge base |
 | `app/` | the web interface — the same events over server-sent events |
 | `mutiny/refactor.py` | Nemotron rewrites a function; the rewrite is applied in place |
 | `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |

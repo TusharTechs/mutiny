@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .session import verify_diff as run_diff
 from .session import verify_function as run_function
+from .session import verify_url as run_url
 
 BOLD, DIM, RED, GREEN, YELLOW, CYAN, RESET = (
     "\033[1m", "\033[2m", "\033[31m", "\033[32m", "\033[33m", "\033[36m", "\033[0m")
@@ -93,6 +94,11 @@ class Render:
 
     def _no_probes(self, e: dict) -> None:
         print(f"  {self.c['yellow']}no usable probes{self.c['reset']}\n")
+
+    def _fetched(self, e: dict) -> None:
+        c = self.c
+        kind = "pull request" if e["pull_request"] else "repository"
+        print(f"{c['dim']}  {kind} {c['reset']}{c['bold']}{e['slug']}{c['reset']}\n")
 
     def _function(self, e: dict) -> None:
         c = self.c
@@ -192,6 +198,13 @@ def verify_diff(args: argparse.Namespace) -> int:
         not args.no_color and sys.stdout.isatty(), args.show)
 
 
+def verify_url(args: argparse.Namespace) -> int:
+    return _render(
+        run_url(args.url, probes=args.probes, forks=args.forks, cap=args.cap,
+                max_functions=args.max_functions),
+        not args.no_color and sys.stdout.isatty(), args.show)
+
+
 def doctor(_args: argparse.Namespace) -> int:
     from .config import have_nebius, nebius_project_id
     from .models import NemotronClient
@@ -237,6 +250,13 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--max-functions", type=int, default=10)
     common(r)
     r.set_defaults(func=verify_diff)
+
+    u = sub.add_parser("verify-url",
+                       help="verify a GitHub repository or pull request by URL")
+    u.add_argument("url", help="https://github.com/owner/repo[/pull/N]")
+    u.add_argument("--max-functions", type=int, default=6)
+    common(u)
+    u.set_defaults(func=verify_url)
 
     d = sub.add_parser("doctor", help="check credentials, models and sandbox access")
     d.set_defaults(func=doctor)
