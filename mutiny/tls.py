@@ -29,10 +29,31 @@ import platform
 import ssl
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
-BUNDLE = Path(__file__).resolve().parent.parent / "certs" / "ca-bundle.pem"
+def _bundle_path() -> Path:
+    """Where the rebuilt certificate bundle can actually be written.
+
+    The repository is the natural home, and on a deployment it is read-only:
+    writing there raised OSError from inside the sandbox availability check, so
+    the live site reported "sandboxes unavailable" for a reason that had nothing
+    to do with sandboxes. Fall back to the temporary directory, which every
+    serverless runtime gives you.
+    """
+    preferred = Path(__file__).resolve().parent.parent / "certs"
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        probe = preferred / ".writable"
+        probe.write_text("")
+        probe.unlink()
+        return preferred / "ca-bundle.pem"
+    except OSError:
+        return Path(tempfile.gettempdir()) / "mutiny-certs" / "ca-bundle.pem"
+
+
+BUNDLE = _bundle_path()
 MAX_AGE_DAYS = 7
 
 # Every toolchain we touch reads a different variable for the same thing.
@@ -96,8 +117,14 @@ def build(force: bool = False) -> Path | None:
     if existing and Path(existing).is_file() and Path(existing) != BUNDLE:
         parts.append(Path(existing).read_text(encoding="utf-8", errors="ignore"))
 
-    BUNDLE.parent.mkdir(parents=True, exist_ok=True)
-    BUNDLE.write_text("\n".join(parts), encoding="utf-8")
+    try:
+        BUNDLE.parent.mkdir(parents=True, exist_ok=True)
+        BUNDLE.write_text("\n".join(parts), encoding="utf-8")
+    except OSError:
+        # Nowhere to write is not a failure worth propagating: the default trust
+        # store is almost certainly fine, and the caller only ever wanted a
+        # working connection.
+        return None
     return BUNDLE
 
 

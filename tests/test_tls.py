@@ -117,3 +117,25 @@ def test_a_probe_that_disagrees_with_itself_is_discarded(tmp_path):
     )
     assert confirmed == [], "a random probe must not be reported as a finding"
     assert [d.input for d in flaky] == ["volatile()"]
+"""Certificate repair must never be the thing that breaks a deployment."""
+
+
+def test_bundle_falls_back_when_the_repository_is_read_only(tmp_path, monkeypatch):
+    """A read-only project directory must not make build() raise.
+
+    On Vercel the bundle path resolved into /var/task, which is read-only, and
+    the OSError surfaced as "sandboxes unavailable" on the live site.
+    """
+    import importlib
+
+    from mutiny import tls
+
+    monkeypatch.setattr(tls, "BUNDLE", tmp_path / "nope" / "ca-bundle.pem")
+
+    def refuse(*args, **kwargs):
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(type(tls.BUNDLE), "mkdir", refuse, raising=False)
+    assert tls.build(force=True) is None
+    assert tls.apply() is None
+    importlib.reload(tls)
