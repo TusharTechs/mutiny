@@ -125,7 +125,11 @@ def verify(args: argparse.Namespace) -> int:
         executor = SandboxExecutor()
         executor.warm(repo)
         print(f"{dim}  ready in {time.monotonic() - started:.1f}s, "
-              f"{executor.archive_bytes // 1024} KiB uploaded{reset}")
+              f"{executor.archive_bytes // 1024} KiB uploaded, "
+              f"{executor.install_mode}{reset}")
+        if executor.install_note:
+            first = executor.install_note.splitlines()[0] if executor.install_note else ""
+            print(f"{dim}  (not installable as a package: {first[:80]}){reset}")
 
     def probe(expressions: list[str]):
         if executor is not None:

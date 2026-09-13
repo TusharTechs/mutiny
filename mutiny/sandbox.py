@@ -56,6 +56,21 @@ def _check(run, what: str):
     return run
 
 
+def declared_dependencies(repo: Path) -> list[str]:
+    """Runtime dependencies from pyproject, without building the package."""
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
+        return []
+    try:
+        import tomllib
+
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - a malformed pyproject is not our problem
+        return []
+    deps = data.get("project", {}).get("dependencies", [])
+    return [d for d in deps if isinstance(d, str)]
+
+
 def _client():
     from contree_sdk import ContreeSync
     from contree_sdk.config import ContreeConfig
@@ -106,6 +121,8 @@ class SandboxExecutor:
     _client_obj: object | None = field(default=None, repr=False)
     _warm: object | None = field(default=None, repr=False)
     _archive_bytes: int = 0
+    install_mode: str = ""
+    install_note: str = ""
     # The service allows 50 concurrent instances per token; leave headroom.
     concurrency: int = 40
 
@@ -115,15 +132,18 @@ class SandboxExecutor:
             self._client_obj = tls.with_repair(_client)
         return self._client_obj
 
-    def warm(
-        self,
-        repo: Path,
-        install: tuple[str, ...] = ("pip", "install", "-q", "-e", "."),
-    ) -> object:
-        """Upload the repository, install it, and keep the result as a checkpoint.
+    def warm(self, repo: Path, install: tuple[str, ...] | None = None) -> object:
+        """Upload the repository, make it importable, and keep that as a checkpoint.
 
-        Everything expensive happens exactly once here. Every later probe forks
+        Everything expensive happens exactly once here; every later probe forks
         this image and pays none of it again.
+
+        Installing is attempted but not required. Plenty of real code is not a
+        distributable package — quotewake, the first outside repository we tried,
+        is flat-layout with several top-level directories, so setuptools refuses
+        to guess what to build. When the install fails we fall back to installing
+        only the declared dependencies, and rely on the working directory being
+        on `sys.path`, which is enough to import the module under test.
         """
         archive = tarball(repo)
         self._archive_bytes = len(archive)
@@ -135,10 +155,28 @@ class SandboxExecutor:
             disposable=False,
             timeout=600,
         ).wait(), "extract")
-        self._warm = _check(image.run(
-            install[0], args=list(install[1:]), cwd=self.workdir,
-            disposable=False, timeout=900,
-        ).wait(), " ".join(install))
+        attempt = image.run(
+            *(install or ("pip", "install", "-q", "-e", "."))[:1],
+            args=list((install or ("pip", "install", "-q", "-e", "."))[1:]),
+            cwd=self.workdir, disposable=False, timeout=900,
+        ).wait()
+
+        if getattr(attempt, "exit_code", 0) == 0:
+            self.install_mode = "editable install"
+            self._warm = attempt
+            return self._warm
+
+        deps = declared_dependencies(repo)
+        self.install_note = (attempt.stderr or attempt.stdout or "").strip()[-300:]
+        if deps:
+            self.install_mode = f"dependencies only ({len(deps)})"
+            self._warm = _check(image.run(
+                "pip", args=["install", "-q", *deps], cwd=self.workdir,
+                disposable=False, timeout=900,
+            ).wait(), "pip install of declared dependencies")
+        else:
+            self.install_mode = "source only"
+            self._warm = image
         return self._warm
 
     @property
