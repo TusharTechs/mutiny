@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import paths
 from . import tls
 from .config import nebius_api_key, nebius_base_url
 
@@ -123,10 +124,13 @@ class NemotronClient:
         cache_dir: Path | None = None,
         ledger_path: Path | None = None,
     ) -> None:
-        root = Path(__file__).resolve().parent.parent
-        self.cache_dir = cache_dir or root / ".cache" / "completions"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.ledger = Ledger(ledger_path or root / ".cache" / "ledger.json").load()
+        root = paths.state(".cache")
+        self.cache_dir = cache_dir or root / "completions"
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:  # a cold cache is slower, not wrong
+            pass
+        self.ledger = Ledger(ledger_path or root / "ledger.json").load()
         self.cap_usd = cap_usd
         # The ledger is cumulative and survives between runs, so comparing the
         # cap against its total makes cap_usd a lifetime limit -- every caller

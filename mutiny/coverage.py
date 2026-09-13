@@ -25,6 +25,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import paths
+
 
 @dataclass(frozen=True)
 class CoverageMap:
@@ -59,7 +61,7 @@ def _cache_path(repo: Path, selector: str, package: str) -> Path | None:
     if not head:
         return None
     key = hashlib.sha256(f"{head}|{selector}|{package}".encode()).hexdigest()[:24]
-    return Path(__file__).resolve().parent.parent / ".cache" / "coverage" / f"{key}.json"
+    return paths.state(".cache") / "coverage" / f"{key}.json"
 
 
 def measure(

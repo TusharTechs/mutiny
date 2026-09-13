@@ -42,15 +42,9 @@ def _bundle_path() -> Path:
     to do with sandboxes. Fall back to the temporary directory, which every
     serverless runtime gives you.
     """
-    preferred = Path(__file__).resolve().parent.parent / "certs"
-    try:
-        preferred.mkdir(parents=True, exist_ok=True)
-        probe = preferred / ".writable"
-        probe.write_text("")
-        probe.unlink()
-        return preferred / "ca-bundle.pem"
-    except OSError:
-        return Path(tempfile.gettempdir()) / "mutiny-certs" / "ca-bundle.pem"
+    from . import paths
+
+    return paths.state("certs") / "ca-bundle.pem"
 
 
 BUNDLE = _bundle_path()
