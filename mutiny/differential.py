@@ -293,7 +293,21 @@ def confirm(
     if not divergences:
         return [], []
     inputs = [d.input for d in divergences]
-    still: set[str] = set(inputs)
+
+    # First: is the probe even deterministic within one version? ShortUUID.uuid()
+    # returns a fresh random value on every call, so it differs across versions
+    # every time and confirmation alone endorses it — the divergence reproduces
+    # perfectly because the probe is random, not because behaviour changed.
+    # A probe that cannot agree with itself cannot testify about anything.
+    first = {o.input: o for o in run_before(inputs)}
+    second = {o.input: o for o in run_before(inputs)}
+    stable = {
+        name for name in inputs
+        if (a := first.get(name)) is not None
+        and (b := second.get(name)) is not None
+        and a.outcome == b.outcome
+    }
+    still: set[str] = set(stable)
     for _ in range(max(1, rounds)):
         before = {o.input: o for o in run_before(inputs)}
         after = {o.input: o for o in run_after(inputs)}

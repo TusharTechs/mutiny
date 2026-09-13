@@ -87,3 +87,33 @@ def test_importing_mutiny_has_no_side_effects(monkeypatch):
     import mutiny
     importlib.reload(mutiny)
     assert "SSL_CERT_FILE" not in os.environ
+
+
+def test_a_probe_that_disagrees_with_itself_is_discarded(tmp_path):
+    """ShortUUID.uuid() returns a fresh random value every call, so it differs
+    across versions every single time. Re-running the comparison endorses it —
+    the divergence reproduces because the probe is random, not because behaviour
+    changed. A probe must agree with itself before it can testify."""
+    import textwrap
+
+    from mutiny.differential import compare, confirm, observe
+
+    (tmp_path / "s.py").write_text(textwrap.dedent('''
+        import os
+        def stable(x): return x * 2
+        def volatile(): return os.urandom(4).hex()
+    '''))
+    probes = ["stable(2)", "volatile()"]
+    before = observe(tmp_path, "s", probes)
+    after = observe(tmp_path, "s", probes, baseline=False)
+
+    # volatile() differs between any two runs; stable() never does
+    assert {d.input for d in compare(before, after)} == {"volatile()"}
+
+    confirmed, flaky = confirm(
+        compare(before, after),
+        run_before=lambda e: observe(tmp_path, "s", e),
+        run_after=lambda e: observe(tmp_path, "s", e, baseline=False),
+    )
+    assert confirmed == [], "a random probe must not be reported as a finding"
+    assert [d.input for d in flaky] == ["volatile()"]
