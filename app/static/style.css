@@ -267,3 +267,61 @@ body {
   vertical-align: -0.32em;
   margin-right: 10px;
 }
+
+/* A run is half a minute or more of real work. These make the wait legible. */
+.activity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+.activity .spin {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.1s ease-in-out infinite;
+  flex: none;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+.activity .elapsed { margin-left: auto; color: var(--faint); }
+
+.timeline {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  border-left: 1px solid var(--line-soft);
+}
+.timeline li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0 5px 14px;
+  position: relative;
+}
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -3.5px;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.timeline li:last-child::before { background: var(--accent); }
+.timeline .what { color: var(--muted); }
+.timeline .note { color: var(--faint); }
+.timeline .at { margin-left: auto; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .activity .spin { animation: none; opacity: 0.9; }
+}

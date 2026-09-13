@@ -330,6 +330,7 @@ def generate_validated(
     diff: str = "",
     stateful: bool = False,
     model: str = SUPER,
+    on_progress=None,
 ):
     """Generate inputs, run them against the unmodified code, and re-ask if too
     few survive.
@@ -377,6 +378,12 @@ def generate_validated(
         usable_obs += usable
 
         rate = len(usable) / len(obs) if obs else 0.0
+        if on_progress is not None:
+            # The caller has no other way to know this phase is alive: it is two
+            # model calls and an execution round, and it is the slowest thing
+            # MUTINY does.
+            on_progress(attempt=attempt, rounds=rounds, produced=len(exprs),
+                        usable=len(usable), kept=len(kept))
         if rate >= min_yield or attempt == rounds:
             break
         hint = REPAIR.format(

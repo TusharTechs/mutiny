@@ -8,31 +8,42 @@ const el = (tag, cls, text) => {
   return node;
 };
 
-const STAGES = [
-  ["rewrite", "rewrite"],
-  ["checkpoint", "checkpoint"],
-  ["probes", "probes"],
-  ["run", "run both"],
-  ["explain", "explain"],
-];
-
 let stream = null;
+let started = 0;
+let ticker = null;
 
-function setStages(state) {
-  const list = $("stages");
-  list.replaceChildren();
-  for (const [key, label] of STAGES) {
-    const li = el("li", state[key] || "", label);
-    list.appendChild(li);
-  }
+// A run is thirty to ninety seconds of work that used to show nothing at all:
+// a fixed row of stage pills, most of which never lit up for a pull request.
+// What it shows now is what it is actually doing, and how long it has been
+// doing it, so a wait reads as progress rather than as a hang.
+function clock() {
+  if (!started) return;
+  $("elapsed").textContent = `${((Date.now() - started) / 1000).toFixed(0)}s`;
 }
 
-function markStage(state, key, value) {
-  for (const [k] of STAGES) {
-    if (state[k] === "active") state[k] = "done";
+function activity(text) {
+  if (!started) {
+    started = Date.now();
+    ticker = setInterval(clock, 200);
   }
-  state[key] = value;
-  setStages(state);
+  $("activity-text").textContent = text;
+  $("activity").hidden = false;
+  clock();
+}
+
+function milestone(text, note) {
+  const li = el("li");
+  li.appendChild(el("span", "what", text));
+  if (note) li.appendChild(el("span", "note", note));
+  li.appendChild(el("span", "at", started
+    ? `${((Date.now() - started) / 1000).toFixed(1)}s` : ""));
+  $("timeline").appendChild(li);
+}
+
+function stopClock() {
+  if (ticker) clearInterval(ticker);
+  ticker = null;
+  $("activity").hidden = true;
 }
 
 function runHeader(parts) {
@@ -145,22 +156,26 @@ function start(id, button) {
 
 function wire(source) {
   stream = source;
-  const state = {};
-  setStages(state);
+  started = 0;
+  if (ticker) clearInterval(ticker);
+  $("timeline").replaceChildren();
+  activity("starting");
   let lastSide = null;
   let currentFunction = null;
+  let forksSeen = 0;
 
   stream.onmessage = (message) => {
     const e = JSON.parse(message.data);
     switch (e.type) {
       case "status":
-        markStage(state, e.stage === "rewrite" ? "rewrite"
-          : e.stage === "checkpoint" ? "checkpoint"
-          : e.stage === "probes" ? "probes" : "explain", "active");
+        activity(e.text || e.stage);
         break;
       case "target":
         runHeader([{ text: e.repo }, { text: e.path },
                    { text: e.function, strong: true }]);
+        break;
+      case "flaky":
+        milestone("discarded as flaky", `${e.count} probe${e.count === 1 ? "" : "s"}`);
         break;
       case "review": {
         const skipped = e.skipped.length ? `${e.skipped.length} skipped` : null;
@@ -169,21 +184,46 @@ function wire(source) {
             strong: true }];
         if (skipped) parts.push({ text: skipped });
         runHeader(parts);
+        milestone("change resolved",
+          `${e.targets.length} function${e.targets.length === 1 ? "" : "s"} to check`);
         break;
       }
-      case "diff": renderDiff(e.lines); break;
-      case "checkpoint": markStage(state, "checkpoint", "done"); break;
-      case "probes": markStage(state, "run", "active"); break;
+      case "diff":
+        renderDiff(e.lines);
+        milestone("rewrite applied", `${e.lines.length} diff lines`);
+        break;
+      case "checkpoint":
+        milestone("sandbox ready", `${e.kib} KiB · ${e.mode}`);
+        activity("generating probes");
+        break;
+      case "probes":
+        milestone("probes generated", `${e.count} inputs`);
+        activity(`running ${e.count} probes against both versions`);
+        break;
       case "fork":
-        if (e.side !== lastSide) { lastSide = e.side; }
+        if (e.side !== lastSide) {
+          lastSide = e.side;
+          forksSeen = 0;
+          activity(`running the ${e.side} version across ${e.total} sandbox forks`);
+        }
         fork(e.side, e.index, e.total, e.state);
+        if (e.state === "done") forksSeen += 1;
         break;
       case "function":
         resetForks();
         currentFunction = e.name;
+        milestone("checking", e.name);
         break;
-      case "result": renderResult(e); break;
-      case "verdict": renderVerdict(e); markStage(state, "explain", "done"); break;
+      case "result":
+        renderResult(e);
+        milestone(e.divergences.length ? "behaviour changed" : "behaviour preserved",
+                  `${e.function} · ${e.probes} probes`);
+        break;
+      case "verdict":
+        renderVerdict(e);
+        milestone("done", `$${(e.cost || 0).toFixed(4)}`);
+        stopClock();
+        break;
       case "no_probes":
         $("results").appendChild(el("p", "agreed",
           `No usable probes were generated for ${e.function}.`));
@@ -191,8 +231,12 @@ function wire(source) {
       case "fetched":
         runHeader([{ text: e.pull_request ? "pull request" : "repository" },
                    { text: e.slug, strong: true }]);
+        milestone("fetched from GitHub", e.slug);
+        activity(e.pull_request ? "working out what the change touched"
+                                : "choosing a function to rewrite");
         break;
       case "error":
+        stopClock();
         $("url-error").textContent = e.message;
         $("url-error").hidden = false;
         $("results").appendChild(el("p", "agreed", e.message));
@@ -201,6 +245,7 @@ function wire(source) {
   };
 
   const finish = () => {
+    stopClock();
     if (stream) stream.close();
     stream = null;
     for (const b of document.querySelectorAll(".card")) b.disabled = false;

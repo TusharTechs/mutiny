@@ -11,8 +11,10 @@ on a wire more often than not.
 from __future__ import annotations
 
 import difflib
+import queue
 import shutil
 import tempfile
+import threading
 import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -497,14 +499,42 @@ def _probe_and_compare(
 
     runner = Runner(executor, repo, python)
 
-    yield _event("status", stage="probes", text="generating probes")
-    generated, _ = generate_validated(
-        client, module, qualname, focused_module(base_source, qualname),
-        probe=lambda e: runner.run(module, e), n=probes,
-        subclasses=receiver_candidates(base_source, qualname),
-        stateful=is_stateful(base_source, qualname),
-        diff=diff_text,
-    )
+    yield _event("status", stage="probes",
+                 text=f"asking Nemotron for inputs to {qualname}")
+
+    # Probe generation is the slowest phase and was completely silent: two model
+    # calls and an execution round per attempt, with nothing said until it
+    # finished. It runs on a thread now so its progress can be yielded as it
+    # happens rather than summarised afterwards.
+    updates: queue.Queue = queue.Queue()
+    outcome: dict[str, Any] = {}
+
+    def generate_on_thread() -> None:
+        try:
+            outcome["value"] = generate_validated(
+                client, module, qualname, focused_module(base_source, qualname),
+                probe=lambda e: runner.run(module, e), n=probes,
+                subclasses=receiver_candidates(base_source, qualname),
+                stateful=is_stateful(base_source, qualname),
+                diff=diff_text,
+                on_progress=lambda **fields: updates.put(fields),
+            )
+        except BaseException as exc:  # noqa: BLE001 - re-raised on the caller's thread
+            outcome["error"] = exc
+        finally:
+            updates.put(None)
+
+    worker = threading.Thread(target=generate_on_thread, daemon=True)
+    worker.start()
+    while (update := updates.get()) is not None:
+        yield _event(
+            "status", stage="probes",
+            text=(f"round {update['attempt']}: {update['produced']} candidates, "
+                  f"{update['usable']} ran clean — {update['kept']} probes so far"))
+    worker.join()
+    if "error" in outcome:
+        raise outcome["error"]
+    generated, _ = outcome["value"]
     if not generated:
         yield _event("no_probes", function=qualname)
         if sink is not None:
