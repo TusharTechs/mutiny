@@ -1,0 +1,216 @@
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+const STAGES = [
+  ["rewrite", "rewrite"],
+  ["checkpoint", "checkpoint"],
+  ["probes", "probes"],
+  ["run", "run both"],
+  ["explain", "explain"],
+];
+
+let stream = null;
+
+function setStages(state) {
+  const list = $("stages");
+  list.replaceChildren();
+  for (const [key, label] of STAGES) {
+    const li = el("li", state[key] || "", label);
+    list.appendChild(li);
+  }
+}
+
+function markStage(state, key, value) {
+  for (const [k] of STAGES) {
+    if (state[k] === "active") state[k] = "done";
+  }
+  state[key] = value;
+  setStages(state);
+}
+
+function runHeader(parts) {
+  const node = $("run-header");
+  node.replaceChildren();
+  parts.forEach((part, i) => {
+    if (i) node.appendChild(el("span", "sep", "·"));
+    node.appendChild(part.strong ? el("b", null, part.text) : el("span", null, part.text));
+  });
+}
+
+function renderDiff(lines) {
+  const pre = $("diff");
+  pre.replaceChildren();
+  for (const line of lines) {
+    const cls = line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : "ctx";
+    const span = el("span", cls, line + "\n");
+    pre.appendChild(span);
+  }
+  $("diff-panel").hidden = false;
+}
+
+function fork(side, index, total, state) {
+  const grid = $(side === "before" ? "forks-before" : "forks-after");
+  while (grid.children.length < total) {
+    grid.appendChild(el("div", "fork", String(grid.children.length + 1)));
+  }
+  const cell = grid.children[index];
+  if (cell) cell.className = "fork " + state;
+  $("forks-panel").hidden = false;
+}
+
+function resetForks() {
+  $("forks-before").replaceChildren();
+  $("forks-after").replaceChildren();
+  $("forks-panel").hidden = true;
+}
+
+function renderResult(e) {
+  const box = el("div", "finding" + (e.divergences.length ? "" : " clean"));
+  box.appendChild(el("h3", null, e.function));
+
+  if (!e.divergences.length) {
+    box.appendChild(el("p", "agreed",
+      `Behaviour preserved — ${e.agreed} of ${e.probes} probes ran on both versions and agreed on every one.`));
+    $("results").appendChild(box);
+    return;
+  }
+
+  box.appendChild(el("div", "where",
+    `${e.divergences.length} of ${e.probes} probes disagree`));
+  if (e.summary) box.appendChild(el("p", "summary", e.summary));
+
+  for (const d of e.divergences.slice(0, 4)) {
+    const w = el("div", "witness");
+    w.appendChild(el("code", "probe", d.input));
+    for (const side of ["before", "after"]) {
+      const row = el("div", "row " + side);
+      row.appendChild(el("b", null, side));
+      row.appendChild(el("span", null, String(d[side])));
+      w.appendChild(row);
+    }
+    box.appendChild(w);
+  }
+  if (e.divergences.length > 4) {
+    box.appendChild(el("div", "where", `…and ${e.divergences.length - 4} more`));
+  }
+  $("results").appendChild(box);
+}
+
+function renderVerdict(e) {
+  const box = $("verdict");
+  box.className = "verdict " + (e.changed ? "changed" : "clean");
+  box.replaceChildren();
+  const text = e.functions === 0
+    ? "Nothing to verify in this change."
+    : e.changed
+      ? `${e.findings} of ${e.functions} changed function${e.functions > 1 ? "s" : ""} behave differently.`
+      : `No behaviour change detected across ${e.functions} function${e.functions > 1 ? "s" : ""}.`;
+  box.appendChild(el("strong", null, text));
+  box.appendChild(el("span", "meta", `${e.seconds}s · $${Number(e.cost).toFixed(4)}`));
+  box.hidden = false;
+}
+
+function start(id, button) {
+  if (stream) stream.close();
+  for (const b of document.querySelectorAll(".card")) {
+    b.setAttribute("aria-pressed", String(b === button));
+    b.disabled = true;
+  }
+  $("run").hidden = false;
+  $("run-header").replaceChildren();
+  $("results").replaceChildren();
+  $("verdict").hidden = true;
+  $("diff-panel").hidden = true;
+  resetForks();
+  const state = {};
+  setStages(state);
+
+  stream = new EventSource(`/api/run/${encodeURIComponent(id)}`);
+  let lastSide = null;
+  let currentFunction = null;
+
+  stream.onmessage = (message) => {
+    const e = JSON.parse(message.data);
+    switch (e.type) {
+      case "status":
+        markStage(state, e.stage === "rewrite" ? "rewrite"
+          : e.stage === "checkpoint" ? "checkpoint"
+          : e.stage === "probes" ? "probes" : "explain", "active");
+        break;
+      case "target":
+        runHeader([{ text: e.repo }, { text: e.path },
+                   { text: e.function, strong: true }]);
+        break;
+      case "review": {
+        const skipped = e.skipped.length ? `${e.skipped.length} skipped` : null;
+        const parts = [{ text: e.repo }, { text: `${e.base}..${e.head}` },
+          { text: `${e.targets.length} changed function${e.targets.length === 1 ? "" : "s"}`,
+            strong: true }];
+        if (skipped) parts.push({ text: skipped });
+        runHeader(parts);
+        break;
+      }
+      case "diff": renderDiff(e.lines); break;
+      case "checkpoint": markStage(state, "checkpoint", "done"); break;
+      case "probes": markStage(state, "run", "active"); break;
+      case "fork":
+        if (e.side !== lastSide) { lastSide = e.side; }
+        fork(e.side, e.index, e.total, e.state);
+        break;
+      case "function":
+        resetForks();
+        currentFunction = e.name;
+        break;
+      case "result": renderResult(e); break;
+      case "verdict": renderVerdict(e); markStage(state, "explain", "done"); break;
+      case "no_probes":
+        $("results").appendChild(el("p", "agreed",
+          `No usable probes were generated for ${e.function}.`));
+        break;
+      case "error":
+        $("results").appendChild(el("p", "agreed", e.message));
+        break;
+    }
+  };
+
+  const finish = () => {
+    if (stream) stream.close();
+    stream = null;
+    for (const b of document.querySelectorAll(".card")) b.disabled = false;
+  };
+  stream.addEventListener("end", finish);
+  stream.onerror = finish;
+}
+
+async function boot() {
+  const res = await fetch("/api/examples");
+  const data = await res.json();
+
+  const badge = $("sandbox-badge");
+  badge.textContent = data.sandboxes.available
+    ? `sandboxes ready · ${data.sandboxes.detail}`
+    : "sandboxes unavailable";
+  badge.className = "badge " + (data.sandboxes.available ? "ok" : "bad");
+
+  const cards = $("cards");
+  cards.replaceChildren();
+  for (const example of data.examples) {
+    const button = el("button", "card");
+    button.type = "button";
+    button.setAttribute("aria-pressed", "false");
+    button.appendChild(el("span", "repo", example.repo));
+    button.appendChild(el("h3", null, example.title));
+    button.appendChild(el("p", null, example.blurb));
+    button.addEventListener("click", () => start(example.id, button));
+    cards.appendChild(button);
+  }
+}
+
+boot();

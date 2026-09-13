@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUTINY — did that change preserve behaviour?</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap masthead-in">
+    <h1 class="wordmark">MUT<span>I</span>NY</h1>
+    <p class="thesis">
+      An agent rewrites your function. The tests pass. We run both versions on
+      hundreds of generated inputs and show you the input where they disagree —
+      or tell you there isn't one.
+    </p>
+    <div class="badges">
+      <span class="badge" id="sandbox-badge">checking sandboxes…</span>
+      <span class="badge quiet">Nemotron 3 · Nebius Token Factory</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="picker" aria-label="Examples">
+    <h2 class="eyebrow">Pick something to verify</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="run" id="run" hidden>
+    <p class="run-header" id="run-header"></p>
+    <ol class="stages" id="stages"></ol>
+
+    <div class="panel" id="diff-panel" hidden>
+      <h3 class="panel-title">The change</h3>
+      <pre class="diff" id="diff"></pre>
+    </div>
+
+    <div class="panel" id="forks-panel" hidden>
+      <h3 class="panel-title">
+        Forks <span class="panel-note">each one an isolated microVM, branched from a single warm checkpoint</span>
+      </h3>
+      <div class="sides">
+        <div class="side"><span class="side-label">original</span><div class="grid" id="forks-before"></div></div>
+        <div class="side"><span class="side-label">rewritten</span><div class="grid" id="forks-after"></div></div>
+      </div>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="verdict" id="verdict" hidden></div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p>Every finding below is an input that was executed against both versions.
+     The sentence explaining it is written from those results and printed above
+     them, so you can check the claim against the evidence.</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -233,6 +233,23 @@ Version.next_version  src/semver/version.py
 28.4s, $0.0070
 ```
 
+## The web interface
+
+```bash
+uv pip install -e ".[web]" --python .venv/bin/python
+.venv/bin/python -m uvicorn app.server:app --port 8000
+```
+
+Four pre-seeded examples — a rewrite that breaks, one that does not, a real
+bug-fix commit reviewed as a pull request, and a pure style commit that should
+stay silent. Forks appear as they run, so the concurrency is visible rather than
+asserted, and each finding shows the plain-English summary above the input that
+proves it.
+
+Repositories are pre-seeded deliberately: a public endpoint that clones and
+installs an arbitrary URL on request is an obvious way to be abused, and the
+demonstration does not need it.
+
 ## Setup
 
 ```bash
@@ -259,7 +276,11 @@ The benchmarks clone three real repositories and run against their history:
 
 | module | responsibility |
 |---|---|
-| `mutiny/cli.py` | `mutiny verify` — the whole loop in one command |
+| `mutiny/session.py` | the verification loop, yielded as events |
+| `mutiny/cli.py` | terminal rendering of that stream |
+| `mutiny/review.py` | resolving a branch or commit into changed functions |
+| `mutiny/explain.py` | Nemotron describes the change, grounded in the witnesses |
+| `app/` | the web interface — the same events over server-sent events |
 | `mutiny/refactor.py` | Nemotron rewrites a function; the rewrite is applied in place |
 | `mutiny/inputs.py` | Nemotron generates probes; execution-validated before use |
 | `mutiny/differential.py` | runs both versions, canonicalises observations, compares |
