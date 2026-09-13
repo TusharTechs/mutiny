@@ -1,6 +1,5 @@
 """Session-level orchestration: target selection and its fallbacks."""
 from pathlib import Path
-from types import SimpleNamespace
 
 
 
@@ -26,9 +25,43 @@ def test_repository_walks_to_the_next_candidate_when_probes_fail(monkeypatch):
 
     monkeypatch.setattr(session, "verify_function", fake_verify)
 
-    source = SimpleNamespace(path=Path("."), slug="owner/repo")
-    events = list(session._verify_repository(source, probes=4, forks=2, cap=1.0))
+    events = list(session._verify_repository(
+        Path("."), "owner/repo", probes=4, forks=2, cap=1.0))
 
     assert attempted == ["first", "second"]
     assert not any(e["type"] == "no_probes" for e in events)
     assert [e for e in events if e["type"] == "result"][0]["function"] == "second"
+
+
+def test_changed_between_matches_what_git_would_report(tmp_path):
+    """The tree diff has to agree with the git diff it replaces."""
+    import subprocess
+
+    from mutiny.diff import changed_between, changed_lines
+
+    repo = tmp_path / "repo"
+    (repo / "pkg").mkdir(parents=True)
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e",
+           "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+
+    def git(*args):
+        subprocess.run(["git", *args], cwd=repo, check=True, env=env,
+                       capture_output=True)
+
+    (repo / "pkg" / "m.py").write_text("def f(x):\n    return x + 1\n\n\ndef g():\n    return 2\n")
+    git("init", "-q"); git("add", "-A"); git("commit", "-qm", "base")
+    (repo / "pkg" / "m.py").write_text(
+        "def f(x):\n    if x < 0:\n        return 0\n    return x + 1\n\n\ndef g():\n    return 2\n")
+    git("add", "-A"); git("commit", "-qm", "head")
+
+    by_git = {c.path: c.lines for c in changed_lines(repo, "HEAD", "HEAD^")}
+
+    before, after = tmp_path / "before", tmp_path / "after"
+    (before / "pkg").mkdir(parents=True); (after / "pkg").mkdir(parents=True)
+    (before / "pkg" / "m.py").write_text("def f(x):\n    return x + 1\n\n\ndef g():\n    return 2\n")
+    (after / "pkg" / "m.py").write_text(
+        "def f(x):\n    if x < 0:\n        return 0\n    return x + 1\n\n\ndef g():\n    return 2\n")
+    by_tree = {c.path: c.lines for c in changed_between(before, after)}
+
+    assert by_git == by_tree == {"pkg/m.py": (2, 3)}

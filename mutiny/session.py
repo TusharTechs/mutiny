@@ -11,6 +11,8 @@ on a wire more often than not.
 from __future__ import annotations
 
 import difflib
+import shutil
+import tempfile
 import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,14 +20,18 @@ from pathlib import Path
 from typing import Any
 
 from . import refactor as refactor_mod
+from . import remote
 from . import review as review_mod
+from .diff import hunk_between
 from .differential import Observation, compare, confirm
-from .explain import explain
-from .fetch import FetchError, cleanup, fetch
 from .differential import observe as local_observe
+from .explain import explain
+# fetch clones with the git binary, which a serverless runtime does not have.
+# It stays for local experiments; everything reached from a URL goes via remote.
+from .fetch import FetchError
 from .inputs import generate_validated, is_stateful, receiver_candidates
 from .models import NemotronClient
-from .sandbox import SandboxExecutor, available, file_at, tarball_at
+from .sandbox import SandboxExecutor, available, file_at, tarball, tarball_at
 from .source import focused_module, function_span
 
 Event = dict[str, Any]
@@ -190,7 +196,70 @@ def verify_diff(
         yield _event("error", message=str(exc))
         return
 
-    yield _event("review", repo=repo.name, base=review.base[:8], head=review.head[:8],
+    yield from _verify_review(
+        review, repo_name=repo.name, deps_repo=repo,
+        archive=lambda: tarball_at(repo, review.base),
+        head_bytes=lambda path: file_at(repo, review.head, path),
+        hunk_text=lambda path: review_mod.hunk(repo, review.base, review.head, path),
+        probes=probes, forks=forks, cap=cap, python=python, started=started,
+    )
+
+
+def verify_trees(
+    before: Path,
+    after: Path,
+    *,
+    base: str = "before",
+    head: str = "after",
+    paths: tuple[str, ...] | None = None,
+    name: str = "",
+    probes: int = 30,
+    forks: int = 8,
+    cap: float = 5.0,
+    max_functions: int = 10,
+    python: str | None = None,
+) -> Iterator[Event]:
+    """Check a change that arrives as two directories rather than two git refs.
+
+    This is what a deployed MUTINY runs: serverless runtimes have no git binary,
+    so both revisions are downloaded and unpacked, and everything downstream is
+    identical.
+    """
+    import sys
+
+    python = python or sys.executable
+    started = time.monotonic()
+    review = review_mod.plan_between(before, after, base, head, paths,
+                                     max_targets=max_functions)
+    yield from _verify_review(
+        review, repo_name=name or after.name, deps_repo=before,
+        archive=lambda: tarball(before),
+        head_bytes=lambda path: (after / path).read_bytes(),
+        hunk_text=lambda path: hunk_between(before, after, path),
+        probes=probes, forks=forks, cap=cap, python=python, started=started,
+    )
+
+
+def _verify_review(
+    review,
+    *,
+    repo_name: str,
+    deps_repo: Path,
+    archive,
+    head_bytes,
+    hunk_text,
+    probes: int,
+    forks: int,
+    cap: float,
+    python: str,
+    started: float,
+) -> Iterator[Event]:
+    """Everything a reviewed change does once its two revisions are readable.
+
+    Both entry points reach the same engine; they differ only in how they answer
+    "give me this file at that revision".
+    """
+    yield _event("review", repo=repo_name, base=review.base[:8], head=review.head[:8],
                  targets=[t.label for t in review.targets],
                  skipped=[{"path": p, "why": w} for p, w in review.skipped])
     if not review.targets:
@@ -205,21 +274,22 @@ def verify_diff(
         yield _event("error", message=f"verify-diff needs Sandboxes: {why}")
         return
 
-    yield _event("status", stage="checkpoint", text=f"warming a checkpoint at {review.base[:8]}")
+    yield _event("status", stage="checkpoint",
+                 text=f"warming a checkpoint at {review.base[:8]}")
     executor = SandboxExecutor()
-    executor.warm_archive(tarball_at(repo, review.base), repo)
+    executor.warm_archive(archive(), deps_repo)
     yield _event("checkpoint", seconds=round(time.monotonic() - started, 1),
                  kib=executor.archive_bytes // 1024, mode=executor.install_mode)
 
     findings = 0
     for target in review.targets:
         yield _event("function", name=target.qualname, path=target.path)
-        overlay = {target.path: file_at(repo, review.head, target.path)}
+        overlay = {target.path: head_bytes(target.path)}
         result: dict[str, Any] = {}
         for event in _probe_and_compare(
-            client=client, repo=repo, module=target.module, qualname=target.qualname,
+            client=client, repo=deps_repo, module=target.module, qualname=target.qualname,
             base_source=target.base_source, overlay=overlay,
-            diff_text=review_mod.hunk(repo, review.base, review.head, target.path),
+            diff_text=hunk_text(target.path),
             probes=probes, forks=forks, use_sandbox=True, python=python,
             started=started, opening=opening, archive=None, executor=executor,
             emit_verdict=False, sink=result,
@@ -251,37 +321,58 @@ def verify_url(
     """
     yield _event("status", stage="fetch", text=f"fetching {url}")
     try:
-        source = fetch(url)
+        target = remote.resolve(url)
     except FetchError as exc:
         yield _event("error", message=str(exc))
         return
 
-    yield _event("fetched", slug=source.slug, pull_request=source.is_pull_request)
+    if isinstance(target, remote.Change):
+        yield _event("fetched", slug=target.slug, pull_request=True)
+        try:
+            checkout = remote.materialise(target)
+        except FetchError as exc:
+            yield _event("error", message=str(exc))
+            return
+        try:
+            yield from verify_trees(
+                checkout.before, checkout.after,
+                base=target.base, head=target.head, paths=target.paths,
+                name=f"{target.owner}/{target.repo}",
+                probes=probes, forks=forks, cap=cap, max_functions=max_functions)
+        finally:
+            if not keep:
+                checkout.cleanup()
+        return
+
+    owner, repo, branch = target
+    yield _event("fetched", slug=f"{owner}/{repo}", pull_request=False)
+    root = Path(tempfile.mkdtemp(prefix="mutiny-repo-"))
     try:
-        if source.is_pull_request:
-            yield from verify_diff(source.path, source.base, source.head,
-                                   probes=probes, forks=forks, cap=cap,
-                                   max_functions=max_functions)
-        else:
-            yield from _verify_repository(source, probes=probes, forks=forks,
-                                          cap=cap, attempts=3)
+        tree = remote.tree(owner, repo, branch, root / repo)
+    except FetchError as exc:
+        shutil.rmtree(root, ignore_errors=True)
+        yield _event("error", message=str(exc))
+        return
+    try:
+        yield from _verify_repository(tree, f"{owner}/{repo}", probes=probes,
+                                      forks=forks, cap=cap, attempts=3)
     finally:
         if not keep:
-            cleanup(source)
+            shutil.rmtree(root, ignore_errors=True)
 
 
 def _verify_repository(
-    source, *, probes: int, forks: int, cap: float, attempts: int = 3,
+    path: Path, slug: str, *, probes: int, forks: int, cap: float, attempts: int = 3,
 ) -> Iterator[Event]:
     """Rewrite and check a function of a repository, moving on if one is unprobeable.
 
     One sandbox is warmed for the whole walk, so falling back to a second target
     costs a rewrite and a round of probe generation, not another install.
     """
-    candidates = _candidate_functions(source.path, limit=attempts)
+    candidates = _candidate_functions(path, limit=attempts)
     if not candidates:
         yield _event("error",
-                     message=f"no function in {source.slug} was suitable to rewrite")
+                     message=f"no function in {slug} was suitable to rewrite")
         return
 
     started = time.monotonic()
@@ -291,7 +382,7 @@ def _verify_repository(
         yield _event("status", stage="checkpoint", text="warming a sandbox checkpoint")
         try:
             executor = SandboxExecutor()
-            executor.warm(source.path)
+            executor.warm(path)
             yield _event("checkpoint", seconds=round(time.monotonic() - started, 1),
                          kib=executor.archive_bytes // 1024, mode=executor.install_mode)
         except Exception as exc:  # noqa: BLE001 - local execution is the fallback
@@ -301,7 +392,7 @@ def _verify_repository(
 
     for index, target in enumerate(candidates):
         probed = True
-        for event in verify_function(source.path, target, probes=probes,
+        for event in verify_function(path, target, probes=probes,
                                      forks=forks, cap=cap, executor=executor):
             if event.get("type") == "no_probes":
                 probed = False
@@ -318,7 +409,7 @@ def _verify_repository(
     yield _event("verdict", changed=False, functions=0, findings=0,
                  seconds=round(time.monotonic() - started, 1), cost=0.0)
     yield _event("error", message=(
-        f"none of the {len(candidates)} busiest functions in {source.slug} could be "
+        f"none of the {len(candidates)} busiest functions in {slug} could be "
         "reached by a generated input — they take objects that need real setup. "
         "Point MUTINY at a pull request, or name a function with --function."))
 

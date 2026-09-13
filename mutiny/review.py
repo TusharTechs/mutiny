@@ -17,7 +17,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .diff import ChangedFile, changed_lines, enclosing_functions
+from .diff import (ChangedFile, changed_between, changed_lines,
+                   enclosing_functions, hunk_between)
 from .source import function_span
 
 
@@ -83,11 +84,56 @@ def plan(repo: Path, base: str, head: str, max_targets: int = 10) -> Review:
     """Which functions this change touched, and which of those we can probe."""
     base_sha, head_sha = resolve(repo, base), resolve(repo, head)
     fork_point = merge_base(repo, base_sha, head_sha)
-    review = Review(base=fork_point, head=head_sha)
+    return _plan(
+        changed_lines(repo, head_sha, fork_point),
+        lambda path: _source_at(repo, fork_point, path),
+        lambda path: _source_at(repo, head_sha, path),
+        fork_point, head_sha, max_targets,
+    )
 
-    for changed in changed_lines(repo, head_sha, fork_point):
-        head_source = _source_at(repo, head_sha, changed.path)
-        base_source = _source_at(repo, fork_point, changed.path)
+
+def plan_between(
+    before: Path,
+    after: Path,
+    base: str,
+    head: str,
+    paths: tuple[str, ...] | None = None,
+    max_targets: int = 10,
+) -> Review:
+    """The same plan, from two directories rather than two git refs.
+
+    This is the path a deployed MUTINY takes: there is no git binary in a
+    serverless runtime, and the two revisions arrive as downloaded trees.
+    """
+    return _plan(
+        changed_between(before, after, paths),
+        lambda path: _read(before / path),
+        lambda path: _read(after / path),
+        base, head, max_targets,
+    )
+
+
+def _read(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _plan(
+    changes: list[ChangedFile],
+    read_base,
+    read_head,
+    base: str,
+    head: str,
+    max_targets: int,
+) -> Review:
+    """Shared by both planners: what differs, and which of it can be probed."""
+    review = Review(base=base, head=head)
+
+    for changed in changes:
+        head_source = read_head(changed.path)
+        base_source = read_base(changed.path)
         if head_source is None:
             review.skipped.append((changed.path, "file is new in this change"))
             continue

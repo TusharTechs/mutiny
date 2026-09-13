@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -78,6 +79,71 @@ def changed_lines(repo: Path, ref: str = "HEAD", base: str | None = None) -> lis
                 files.setdefault(current, []).extend(range(start, start + count))
 
     return [ChangedFile(p, tuple(sorted(set(ls)))) for p, ls in sorted(files.items()) if ls]
+
+
+def _lines(path: Path) -> list[str] | None:
+    try:
+        return path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def changed_between(
+    before: Path, after: Path, paths: Iterable[str] | None = None
+) -> list[ChangedFile]:
+    """The same question as changed_lines, asked of two directories.
+
+    `git diff` is not available everywhere MUTINY needs to run -- a serverless
+    runtime ships a Python and little else -- and the comparison does not
+    actually need git. Two trees on disk and difflib answer it identically.
+
+    Deletions are excluded, as before: a line that no longer exists cannot be
+    probed. Line numbers refer to the `after` tree, which is the version that
+    will be executed.
+    """
+    import difflib
+
+    if paths is None:
+        candidates = sorted(str(p.relative_to(after))
+                            for p in after.rglob("*.py") if p.is_file())
+    else:
+        candidates = sorted(set(paths))
+
+    changed: list[ChangedFile] = []
+    for path in candidates:
+        if not _is_source(path):
+            continue
+        new = _lines(after / path)
+        if new is None:
+            continue
+        old = _lines(before / path)
+        if old is None:
+            # New file: every line is new. review.plan reports it as skipped,
+            # but it has to reach that decision rather than vanish here.
+            changed.append(ChangedFile(path, tuple(range(1, len(new) + 1))))
+            continue
+        if old == new:
+            continue
+
+        touched: list[int] = []
+        for tag, _, _, j1, j2 in difflib.SequenceMatcher(
+            a=old, b=new, autojunk=False
+        ).get_opcodes():
+            if tag in ("replace", "insert"):
+                touched.extend(range(j1 + 1, j2 + 1))
+        if touched:
+            changed.append(ChangedFile(path, tuple(sorted(set(touched)))))
+    return changed
+
+
+def hunk_between(before: Path, after: Path, path: str, context: int = 4) -> str:
+    """A unified diff of one file between two trees, for showing to a reader."""
+    import difflib
+
+    old = _lines(before / path) or []
+    new = _lines(after / path) or []
+    return "\n".join(difflib.unified_diff(
+        old, new, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="", n=context))
 
 
 def source_commits(repo: Path, limit: int = 20, since: str | None = None) -> list[str]:
