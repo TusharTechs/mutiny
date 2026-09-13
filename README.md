@@ -1,10 +1,16 @@
-<img src="docs/brand/mark.svg" width="72" alt="">
+<p align="center">
+  <img src="docs/brand/mark.svg" width="88" alt="">
+</p>
 
-# MUTINY
+<h1 align="center">MUTINY</h1>
 
-**Did that refactor actually preserve behaviour?**
+<p align="center"><b>Did that refactor actually preserve behaviour?</b></p>
 
-[Live demo](https://mutiny-verify.vercel.app) · [Architecture](#architecture) · [Results](#results)
+<p align="center">
+  <a href="https://mutiny-verify.vercel.app">Live demo</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#results">Results</a>
+</p>
 
 An agent rewrites your function. The tests pass. MUTINY runs both versions on
 hundreds of generated inputs and shows you the exact input where they disagree —
@@ -299,42 +305,38 @@ the same generated inputs inside the same sandbox image, and the answer is eithe
 an input where they disagree or a statement that none was found.
 
 ```mermaid
+%%{init: {"flowchart": {"useMaxWidth": true, "nodeSpacing": 26, "rankSpacing": 34, "padding": 6}}}%%
 flowchart TB
-    URL(["<b>GitHub URL</b><br/>a repository, or a pull request"])
-    REMOTE["<b>remote.py</b> — two revisions over HTTPS<br/>tarballs · merge base from the API · no git binary"]
+    URL(["<b>GitHub URL</b>"])
+    REMOTE["<b>remote.py</b><br/>two revisions over HTTPS"]
+    WHAT{"pull request?"}
+    PR["<b>review.py</b><br/>merge base vs head"]
+    RW["<b>refactor.py</b><br/>Nemotron rewrites it"]
+    WARM[["<b>Nebius Sandboxes</b><br/>install once · 9.8s"]]
+    GEN["<b>inputs.py</b><br/>Nemotron writes probes"]
+    BEFORE["<b>before</b>"]
+    AFTER["<b>after</b>"]
+    CMP["<b>differential.py</b><br/>canonicalise · compare"]
+    CONF{"reproduces?"}
+    EXP["<b>explain.py</b><br/>one sentence"]
+    OUT(["<b>Witness</b>"])
+    NONE(["<b>No divergence</b>"])
 
-    subgraph WHAT ["What are the two versions?"]
-        direction LR
-        PR["<b>pull request</b><br/>review.py<br/>merge base vs head"]
-        RW["<b>repository</b><br/>refactor.py<br/>Nemotron rewrites the busiest function"]
-    end
-
-    WARM[["<b>Nebius Sandboxes</b> — install once, then fork<br/>checkpoint warm in 9.8s"]]
-    GEN["<b>inputs.py</b> — Nemotron writes probes<br/>every probe is executed before it counts as one"]
-
-    subgraph FORK ["One checkpoint, forked 40 ways · 3.7s"]
-        direction LR
-        BEFORE["<b>before</b><br/>the original"]
-        AFTER["<b>after</b><br/>the change"]
-    end
-
-    CMP["<b>differential.py</b><br/>canonicalise both sides, then compare"]
-    CONF{"<b>confirm</b><br/>run the same version twice —<br/>does the divergence reproduce?"}
-    EXP["<b>explain.py</b> — Nemotron writes one sentence,<br/>allowed to describe only what executed"]
-    OUT(["<b>Witness</b><br/>the input, and what each version returned"])
-    NONE(["<b>No divergence found</b><br/>n probes ran on both and agreed"])
-
-    URL --> REMOTE --> WHAT --> WARM --> GEN --> FORK --> CMP
-    CMP -- "they disagree" --> CONF
+    URL --> REMOTE --> WHAT
+    WHAT -- yes --> PR --> WARM
+    WHAT -- "no, so make one" --> RW --> WARM
+    WARM --> GEN
+    GEN -- "40 forks · 3.7s" --> BEFORE --> CMP
+    GEN --> AFTER --> CMP
+    CMP -- "they differ" --> CONF
     CMP -- "all agreed" --> NONE
-    CONF -- "reproduces" --> EXP --> OUT
-    CONF -- "flaky — not evidence" --> NONE
+    CONF -- yes --> EXP --> OUT
+    CONF -- "flaky, not evidence" --> NONE
 
     style URL fill:#4ecdc4,stroke:#2a9d94,color:#000
     style WARM fill:#e879f9,stroke:#c026d3,color:#000
     style GEN fill:#fbbf24,stroke:#d97706,color:#000
     style CONF fill:#fbbf24,stroke:#d97706,color:#000
-    style EXP fill:#fbbf24,stroke:#d97706,color:#000
     style OUT fill:#e56a6a,stroke:#b83c3c,color:#000
     style NONE fill:#5ac77e,stroke:#2f9350,color:#000
 ```
