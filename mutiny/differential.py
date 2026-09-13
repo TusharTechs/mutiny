@@ -339,6 +339,7 @@ def confirm(
     run_before,
     run_after,
     rounds: int = 2,
+    samples: int = 3,
 ) -> tuple[list[Divergence], list[Divergence]]:
     """Re-run the divergent probes; keep only those that disagree every time.
 
@@ -360,14 +361,23 @@ def confirm(
     # every time and confirmation alone endorses it — the divergence reproduces
     # perfectly because the probe is random, not because behaviour changed.
     # A probe that cannot agree with itself cannot testify about anything.
-    first = {o.input: o for o in run_before(inputs)}
-    second = {o.input: o for o in run_before(inputs)}
-    stable = {
-        name for name in inputs
-        if (a := first.get(name)) is not None
-        and (b := second.get(name)) is not None
-        and a.outcome == b.outcome
-    }
+    #
+    # Two samples is not enough. Asking a coin twice whether it is deterministic
+    # gets "yes" half the time, and shortuuid's random(length=1) draws one
+    # character from an alphabet of 57 -- a 1-in-57 chance of looking perfectly
+    # stable. It took exactly that chance in a corpus run and was reported as a
+    # behaviour change. Three samples makes it 1 in 3249, for one extra
+    # execution of a handful of probes.
+    #
+    # Both sides are checked. A probe that is deterministic before a change and
+    # random after it is just as incapable of testifying.
+    stable = set(inputs)
+    for run in (run_before, run_after):
+        observed = [{o.input: o for o in run(inputs)} for _ in range(max(2, samples))]
+        for name in list(stable):
+            seen = [batch[name] for batch in observed if name in batch]
+            if len(seen) != len(observed) or len({o.outcome for o in seen}) != 1:
+                stable.discard(name)
     still: set[str] = set(stable)
     for _ in range(max(1, rounds)):
         before = {o.input: o for o in run_before(inputs)}

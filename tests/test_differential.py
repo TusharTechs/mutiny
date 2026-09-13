@@ -42,3 +42,45 @@ def test_stripping_identities_does_not_swallow_values():
     assert strip("Point(x=42, y=7)") == "Point(x=42, y=7)"
     assert strip("Row(id=123456, name='a')") == "Row(id=123456, name='a')"
     assert strip("<mutiny.Thing object at 0x7f9a1b2c3d4e>") == "<mutiny.Thing object>"
+
+
+def test_a_low_entropy_random_probe_is_not_evidence():
+    """Two samples cannot tell a coin from a constant.
+
+    shortuuid's random(length=1) draws one character from 57. Asked twice
+    whether it was deterministic it said yes, and a corpus run reported the
+    resulting difference as a behaviour change.
+    """
+    from mutiny.differential import Observation, confirm, compare
+
+    values = iter(["a", "a", "b", "a", "b", "a", "b", "a", "b", "a"])
+
+    def run_before(inputs):
+        return [Observation(input=i, ok=True, value=next(values), type="str")
+                for i in inputs]
+
+    def run_after(inputs):
+        return [Observation(input=i, ok=True, value="z", type="str") for i in inputs]
+
+    before = [Observation(input="roll()", ok=True, value="a", type="str")]
+    after = [Observation(input="roll()", ok=True, value="z", type="str")]
+
+    confirmed, flaky = confirm(compare(before, after), run_before, run_after)
+    assert confirmed == [], "a probe that disagrees with itself cannot testify"
+    assert len(flaky) == 1
+
+
+def test_a_genuinely_stable_divergence_still_survives_confirmation():
+    from mutiny.differential import Observation, compare, confirm
+
+    def run_before(inputs):
+        return [Observation(input=i, ok=True, value="1", type="int") for i in inputs]
+
+    def run_after(inputs):
+        return [Observation(input=i, ok=True, value="2", type="int") for i in inputs]
+
+    before = [Observation(input="f()", ok=True, value="1", type="int")]
+    after = [Observation(input="f()", ok=True, value="2", type="int")]
+
+    confirmed, flaky = confirm(compare(before, after), run_before, run_after)
+    assert len(confirmed) == 1 and flaky == []
