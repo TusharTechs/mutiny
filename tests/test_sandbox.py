@@ -25,3 +25,20 @@ def test_tarball_keeps_what_an_install_needs(tmp_path):
     assert {"src/pkg/__init__.py", "pyproject.toml", "README.md", "LICENSE"} <= names
     assert "docs/guide.md" not in names
     assert "src/pkg/logo.png" not in names
+
+
+def test_tarball_keeps_directories_that_hold_python(tmp_path):
+    """A prunable name is not enough: django/conf/locale is an imported package."""
+    import io
+    import tarfile
+
+    from mutiny.sandbox import tarball
+
+    (tmp_path / "pkg" / "docs").mkdir(parents=True)
+    (tmp_path / "pkg" / "docs" / "__init__.py").write_text("LANGS = {}\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "index.txt").write_text("prose\n")
+
+    names = set(tarfile.open(fileobj=io.BytesIO(tarball(tmp_path))).getnames())
+    assert "pkg/docs/__init__.py" in names
+    assert "docs/index.txt" not in names

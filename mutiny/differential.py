@@ -28,6 +28,14 @@ import ast, importlib, json, os, random, re, sys
 
 sys.path.insert(0, os.getcwd())
 
+# When the editable install fails -- sqlalchemy's needs a C toolchain and does
+# not get one -- the package is still sitting in the tree, just not on the path.
+# src-layout projects keep it one level down, so look there too.
+for _layout in ("src", "lib"):
+    _dir = os.path.join(os.getcwd(), _layout)
+    if os.path.isdir(_dir):
+        sys.path.insert(1, _dir)
+
 # Anything drawing on `random` differs between two runs for reasons the caller
 # cannot control. cachetools' RRCache evicts a random entry, and comparing two
 # unseeded runs of it reports a behaviour change on every probe.
@@ -76,6 +84,40 @@ def describe(value):
 
 module_name, out_path = sys.argv[1], sys.argv[2]
 exprs = json.load(open(sys.argv[3]))
+
+
+def _bootstrap():
+    """Some frameworks cannot be imported until they have been configured.
+
+    Importing django.db.models.base raises ImproperlyConfigured before a single
+    probe runs, and no input the generator writes can get past it -- the barrier
+    is at import time, not call time. A framework that ships a documented
+    bootstrap is given it. Anything else is left alone: this is deliberately a
+    short list of known bootstraps, not a guess at what a project might need.
+    """
+    try:
+        import django
+        from django.conf import settings
+    except ImportError:
+        return
+    if settings.configured:
+        return
+    try:
+        settings.configure(
+            DEBUG=True, USE_TZ=True, SECRET_KEY="mutiny", ALLOWED_HOSTS=["*"],
+            # Compiled translation catalogues are not source and are not
+            # uploaded, so leave gettext out of the picture entirely.
+            USE_I18N=False,
+            DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3",
+                                   "NAME": ":memory:"}},
+            INSTALLED_APPS=["django.contrib.contenttypes", "django.contrib.auth"],
+        )
+        django.setup()
+    except Exception:
+        pass
+
+
+_bootstrap()
 mod = importlib.import_module(module_name)
 base = dict(vars(mod))
 

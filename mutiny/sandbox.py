@@ -31,9 +31,13 @@ MARKER = "\x00MUTINY\x00"
 
 
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-             ".ruff_cache", "node_modules", ".tox", "build", "dist", ".eggs",
-             "docs", "doc", "examples", "benchmarks", "media", "locale",
-             "static", "images", "img", "assets", "fixtures", ".github"}
+             ".ruff_cache", "node_modules", ".tox", "build", "dist", ".eggs"}
+
+# Directories worth dropping, but only when they hold no Python. `locale` looked
+# like an obvious cut until django/conf/locale turned out to be a package the
+# framework imports at startup; a name alone is not enough to judge by.
+PRUNABLE = {"docs", "doc", "examples", "benchmarks", "media",
+            "images", "img", "assets", ".github"}
 
 # We need the code and enough packaging metadata to install it. Everything else —
 # documentation, images, translations, sample data — is weight on the wire.
@@ -123,14 +127,16 @@ def _client():
     pid = nebius_project_id()
     if pid:
         os.environ.setdefault("NEBIUS_PROJECT_ID", pid)
-    client = ContreeSync()
-    # Ten seconds is the SDK default and a large archive cannot be uploaded in it;
-    # django failed on exactly this.
+    # Ten seconds is the SDK default and a multi-megabyte archive cannot be
+    # uploaded in it — django failed on exactly this. The timeout has to be set
+    # on the config passed to the constructor: assigning to client.config
+    # afterwards changes nothing, because the HTTP client is already built.
     try:
-        client.config.transport_timeout = UPLOAD_TIMEOUT
-    except Exception:  # noqa: BLE001 - an older SDK without the field still works
-        pass
-    return client
+        from contree_sdk.config import ContreeConfig
+
+        return ContreeSync(config=ContreeConfig(transport_timeout=UPLOAD_TIMEOUT))
+    except (ImportError, TypeError):  # an older SDK without the field still works
+        return ContreeSync()
 
 
 def tarball(repo: Path) -> bytes:
@@ -140,6 +146,10 @@ def tarball(repo: Path) -> bytes:
     enough to exhaust the transport timeout before the first run even starts. One
     archive is one upload.
     """
+    prune = {d.relative_to(repo) for d in repo.rglob("*")
+             if d.is_dir() and d.name in PRUNABLE
+             and not any(d.rglob("*.py"))}
+
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for path in sorted(repo.rglob("*")):
@@ -147,6 +157,8 @@ def tarball(repo: Path) -> bytes:
                 continue
             rel = path.relative_to(repo)
             if SKIP_DIRS & set(rel.parts):
+                continue
+            if any(parent in prune for parent in rel.parents):
                 continue
             # Files in the repository root are what packaging metadata points at:
             # flask's pyproject names README.md, and dropping it made the editable

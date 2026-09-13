@@ -1,0 +1,342 @@
+[
+  {
+    "url": "https://github.com/pallets/flask",
+    "slug": "pallets/flask",
+    "python_files": 83,
+    "source_mb": 0.6,
+    "archive_kb": 264,
+    "function": "explain_template_loading_attempts",
+    "attempts": 2,
+    "probes": 1,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 2.5,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 9.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 2.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 1.9,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "compare",
+        "seconds": 3.2,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/psf/requests",
+    "slug": "psf/requests",
+    "python_files": 37,
+    "source_mb": 0.4,
+    "archive_kb": 123,
+    "function": "super_len",
+    "attempts": 3,
+    "probes": 9,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 3.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 9.6,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 1.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "compare",
+        "seconds": 3.5,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/Textualize/rich",
+    "slug": "Textualize/rich",
+    "python_files": 213,
+    "source_mb": 1.7,
+    "archive_kb": 424,
+    "function": "Style.__str__",
+    "attempts": 1,
+    "probes": 13,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 4.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 0.3,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 11.2,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 1.8,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "compare",
+        "seconds": 3.4,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": ""
+  },
+  {
+    "url": "https://github.com/sqlalchemy/sqlalchemy",
+    "slug": "sqlalchemy/sqlalchemy",
+    "python_files": 673,
+    "source_mb": 19.8,
+    "archive_kb": 3585,
+    "function": "ClauseAdapter.replace",
+    "attempts": 3,
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 5.3,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 0.9,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 2.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 22.5,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 1.8,
+        "ok": false,
+        "detail": "RuntimeError: driver failed (exit 1): ortlib._bootstrap>\", line 1310, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 488, in _call_with_frames_removed\n  File \"<frozen importlib._bootstrap>\", line"
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 0.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      }
+    ],
+    "failed_at": "probes"
+  },
+  {
+    "url": "https://github.com/django/django",
+    "slug": "django/django",
+    "python_files": 2932,
+    "source_mb": 18.5,
+    "archive_kb": 3500,
+    "function": "display_for_field",
+    "attempts": 3,
+    "probes": 0,
+    "divergent": 0,
+    "stages": [
+      {
+        "name": "fetch",
+        "seconds": 13.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "locate",
+        "seconds": 1.7,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "archive",
+        "seconds": 3.5,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "warm",
+        "seconds": 27.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "refactor",
+        "seconds": 0.0,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 36.5,
+        "ok": false,
+        "detail": "RuntimeError: driver failed (exit 1): re.checks.translation  # NOQA isort:skip\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/django/core/checks/translation.py\", line 3, in <module>\n    from django.utils.transla"
+      },
+      {
+        "name": "refactor",
+        "seconds": 5.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 25.5,
+        "ok": false,
+        "detail": "RuntimeError: driver failed (exit 1): re.checks.translation  # NOQA isort:skip\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/django/core/checks/translation.py\", line 3, in <module>\n    from django.utils.transla"
+      },
+      {
+        "name": "refactor",
+        "seconds": 12.1,
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probes",
+        "seconds": 13.9,
+        "ok": false,
+        "detail": "RuntimeError: driver failed (exit 1): re.checks.translation  # NOQA isort:skip\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/django/core/checks/translation.py\", line 3, in <module>\n    from django.utils.transla"
+      }
+    ],
+    "failed_at": "probes"
+  }
+]

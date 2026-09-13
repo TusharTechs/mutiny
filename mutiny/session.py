@@ -303,7 +303,7 @@ def _verify_repository(
         probed = True
         for event in verify_function(source.path, target, probes=probes,
                                      forks=forks, cap=cap, executor=executor):
-            if event.get("event") == "no_probes":
+            if event.get("type") == "no_probes":
                 probed = False
                 remaining = len(candidates) - index - 1
                 yield _event(
