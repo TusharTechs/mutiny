@@ -1,4 +1,4 @@
-# 53 merged pull requests nobody chose for our benefit
+# 49 merged pull requests nobody chose for our benefit
 
 Every earlier number answers a narrower question: can MUTINY detect a behaviour
 change that was deliberately introduced — by a known fix commit, or by asking a
@@ -16,44 +16,31 @@ results by **what each pull request claimed about itself**:
     other     no convention in the title to go on.
 
 `experiments/prs/run.py`. The claim is classified from the title and labels by
-regex, which is a heuristic; every title is recorded in the results so a reader
-can disagree with any particular call.
+regex, which is a heuristic; every title is in the results so a reader can
+disagree with any particular call.
 
 ## Results
 
-    claim        n   divergence  preserved  no-probes  no-target  error
-    fix         15            7          5          1          1      1
-    no-claim     8            1          2          1          3      1
-    feature      5            0          2          0          2      1
-    other       25            3          8          4         10      0
+    claim        n  divergence preserved no-probes no-target new-code nothing- error
+    fix         15          6         5         2        0        0        0      2
+    no-claim     7          1         4         0        0        0        1      1
+    feature      5          0         3         0        1        0        0      1
+    other       22          3        11         4        1        3        0      0
 
-    reached a verdict           28/53
-    behaviour change found      11/28
-    spend                       $0.26 for the whole corpus
+    had behaviour to check      45/49
+    reached a verdict           33/45
+    behaviour change found      10/33
+    spend                       $0.26 for the corpus
 
-## The number that matters most is 28/53
-
-Just over half the pull requests produced an answer at all. The other 25 are not
-"no behaviour change found" — they are *no result*, and folding them into a
-detection rate would be dishonest:
-
-- **16 no-target.** The changed lines were not inside a function MUTINY could
-  locate and probe: module-level constants, class bodies, decorators, type
-  annotations, or a file whose changed function could not be resolved in both
-  revisions.
-- **6 no-probes.** A target was found and no generated input could construct it.
-  This is the stateful-construction weakness documented three times in
-  `findings-differential.md` and confirmed on sqlalchemy in `findings-limits.md`.
-- **3 error.** Installation or execution failed.
-
-On the 28 that did produce an answer, and where the author said a behaviour
-change was intended, MUTINY found one **7 times out of 12**.
+Four of the 49 had no behaviour to check at all: three added only new code, and
+one changed no library source. Those are not failures to find anything — they
+are pull requests with nothing for a differential tool to compare, and counting
+them against the tool would be measuring the shape of the corpus.
 
 ## The case the benchmark was built to find
 
 `jd/tenacity#679` — *"refactor: drop always-true truthiness checks and enable
-truthy-bool"*. A pull request whose title is an explicit claim that behaviour is
-preserved.
+truthy-bool"*. A title that is an explicit claim that behaviour is preserved.
 
     RetryCallState(retry_object=Retrying(wait=None), ...)
       before  0.0
@@ -63,27 +50,56 @@ The change removed `if self.wait:` before calling `self.wait(retry_state)`. The
 author's reasoning is in the pull request body and it is sound: `wait` is typed
 `WaitBaseT`, which implements neither `__bool__` nor `__len__`, so the guard can
 only ever be true — *for a caller who respects the type*. MUTINY found the exact
-boundary of that assumption: a caller passing `None` or `False` got `0.0` before
-and gets a `TypeError` now.
+boundary of that assumption.
 
-Whether that matters is a judgement about whether untyped callers exist in the
+Whether it matters is a judgement about whether untyped callers exist in the
 wild, and this experiment does not make it. That is the intended division of
 labour: the tool produces a reproducible fact, the reviewer decides what it is
 worth. What it is not is a guess.
 
+## Two false positives this corpus found in MUTINY itself
+
+Running against code nobody selected is a better test of the tool than of the
+code. Both of these were reported as confident findings, and neither was one.
+
+**An identity that is not written "at 0x...".** `jd/tenacity#682` did nothing
+but add `@override` decorators and reported eight divergences. Every one was a
+memory address: tenacity's repr is `<RetryCallState 140737342193440: ...>`, with
+the id straight after the class name, and the address filter only matched the
+default `object at 0x...` shape. The decorators shifted the allocation order and
+every address moved.
+
+`confirm()` could not have caught it, and this is the interesting part: two
+fresh processes allocate identically, so the value looked perfectly stable
+*within* each version and different *between* them. **Stability across runs is
+not the same property as being a value**, and only canonicalisation can tell
+them apart.
+
+The tell was already on the page. Nemotron's explanation read *"the only
+observable difference is the object's address"* directly beneath a verdict
+saying behaviour had changed.
+
+**A coin that landed the same way twice.** `shortuuid#103` — *"Improve
+randomness"* — reported `random(length=1)` returning `'4'` before and `'a'`
+after. Confirmation ran the unchanged version twice and kept probes that agreed
+with themselves; one character drawn from an alphabet of 57 has a 1-in-57 chance
+of agreeing by luck, and it took that chance.
+
+Sandbox forks sharing entropy was the other candidate explanation and was ruled
+out by measurement: forked from one checkpoint, `os.urandom` and
+`secrets.choice` both still vary. Confirmation now takes three samples — 1 in
+3249 — and checks both versions rather than only the unchanged one. The finding
+is now correctly reported as preserved.
+
 ## A finding class worth naming: the arbitrary value that changed
 
-Two of the eleven are true divergences of low value.
-
 `Textualize/rich#3845` — *"Use faster generator for link IDs"* — changed link
-IDs from `randint(0, 999999)` to a counter. MUTINY reports 24 divergences, all
-of the form `'403958'` → `'14167048'`. `skorokithakis/shortuuid#103` —
-*"Improve randomness"* — is the same shape.
+IDs from `randint(0, 999999)` to a counter, and MUTINY reports 24 divergences of
+the form `'794772'` → `'14167049'`.
 
-These are real, reproducible and almost certainly uninteresting: the value was
-arbitrary before and is arbitrary now. They are detectable at all because the
-driver pins the random seed to make comparison possible, which turns "this value
-is random" into "this value is deterministic and different".
+This one is real and survives confirmation legitimately: both implementations
+are deterministic under a pinned seed, so it is not a flake. It is simply not
+interesting. The value was arbitrary before and is arbitrary now.
 
 Pinning the seed remains right — without it every such function diverges from
 itself. But a change whose only divergence is in a value that was never
@@ -96,6 +112,8 @@ It shows the mechanism works on code chosen by other people for their own
 reasons, at about half a cent per pull request, and that it can single out the
 one function a fix touched from among several candidates.
 
-It does not show that the coverage is adequate. 25 of 53 produced nothing, and
-the largest bucket — changed lines that are not inside a probeable function — is
-not addressed by any work done so far.
+It does not show the coverage is adequate. A third of the pull requests with
+real behaviour to check still produce no verdict, and the largest remaining
+cause is a target no generated input can construct — the stateful-construction
+weakness documented in `findings-differential.md` and confirmed on sqlalchemy in
+`findings-limits.md`.
