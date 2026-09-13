@@ -47,11 +47,77 @@ ROOT = Path(__file__).resolve().parent
 CHECKOUTS = ROOT.parent / "checkouts"
 SEED = 20260913
 SUBSET_FRACTION = 0.34
-SUBSET_DRAWS = 3
 N_INPUTS = 30
 
-# (repo, module, functions worth rewriting)
-TARGETS = [
+def discover_targets(repo: Path, limit: int = 14) -> list[tuple[str, str]]:
+    """Functions worth rewriting, chosen by shape rather than by hand.
+
+    Hand-picking targets puts the experimenter inside the measurement. The rule
+    here is mechanical: a function with real branching, in a source file, not a
+    trivial accessor, that resolves unambiguously.
+    """
+    import ast
+
+    found: list[tuple[int, str, str]] = []
+    skip = {".git", ".venv", "tests", "test", "build", "dist", "docs"}
+    for path in sorted(repo.rglob("*.py")):
+        rel = path.relative_to(repo)
+        if skip & set(rel.parts) or rel.name.startswith(("test_", "setup", "conf")):
+            continue
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        module = module_name(str(rel))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    found.append(_score(child, f"{node.name}.{child.name}", module))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                found.append(_score(node, node.name, module))
+
+    ranked = sorted((f for f in found if f[0] > 0), key=lambda f: -f[0])
+    out, seen = [], set()
+    for _score_value, qualname, module in ranked:
+        if qualname in seen:
+            continue
+        seen.add(qualname)
+        out.append((module, qualname))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _score(node, qualname: str, module: str) -> tuple[int, str, str]:
+    import ast
+
+    body = list(ast.walk(node))
+    branches = sum(1 for n in body if isinstance(n, (ast.If, ast.For, ast.While, ast.Try)))
+    returns = sum(1 for n in body if isinstance(n, ast.Return) and n.value)
+    lines = (node.end_lineno or node.lineno) - node.lineno
+    if lines < 5 or lines > 70 or branches == 0 or node.name.startswith("__init__"):
+        return (0, qualname, module)
+    return (branches * 2 + returns + min(lines, 40) // 10, qualname, module)
+
+
+def module_name(path: str) -> str:
+    parts = list(Path(path).with_suffix("").parts)
+    if parts and parts[0] in {"src", "lib"}:
+        parts = parts[1:]
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
+REPOS = ["python-semver", "cachetools", "schedule", "shortuuid", "pytimeparse"]
+PER_REPO = 14
+SUBSET_DRAWS = 2
+
+TARGETS_MANUAL = [
     ("python-semver", "semver.version",
      ["Version.next_version", "Version.compare", "Version.match", "Version.bump_build",
       "Version.bump_prerelease", "Version.replace", "Version.parse"]),
@@ -254,14 +320,16 @@ def main() -> int:
     out = ROOT / "results" / f"thin-{time.strftime('%Y%m%d-%H%M%S')}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    for repo_name, module, functions in TARGETS:
+    for repo_name in REPOS:
         repo = CHECKOUTS / repo_name
         python_exe = str(repo / ".venv" / "bin" / "python")
         if not Path(python_exe).exists():
             print(f"  {repo_name}: no venv, skipping")
             continue
-        print(f"\n{repo_name}  ({len(test_files(repo))} test files)")
-        for qualname in functions:
+        discovered = discover_targets(repo, PER_REPO)
+        print(f"\n{repo_name}  ({len(test_files(repo))} test files, "
+              f"{len(discovered)} targets)")
+        for module, qualname in discovered:
             try:
                 case = run_case(client, repo, repo_name, module, qualname, python_exe, rng)
             except BudgetExceeded as exc:
