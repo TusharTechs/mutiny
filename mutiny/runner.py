@@ -54,10 +54,13 @@ class PytestRun:
         if not self.outcomes:
             return SELECTION_ERROR if self.exit_status in _SELECTION_EXITS else NO_TESTS
         statuses = {o.status for o in self.outcomes}
-        for dominant in (ERRORED, FAILED_ASSERTION, SKIPPED):
+        # Order matters, and skipped must not dominate. A suite where 362 tests
+        # pass and one is skipped is a passing suite; treating it as SKIPPED made
+        # `verdict == PASSED` read a healthy run as a failure.
+        for dominant in (ERRORED, FAILED_ASSERTION):
             if dominant in statuses:
                 return dominant
-        return PASSED
+        return PASSED if PASSED in statuses else SKIPPED
 
     @property
     def exc_types(self) -> tuple[str, ...]:

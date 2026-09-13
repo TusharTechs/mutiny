@@ -55,3 +55,24 @@ def test_assertion_failure_is_distinct_from_an_error(repo):
     proof.write_text("def test_errors():\n    raise KeyError('boom')\n")
     run = run_pytest(repo, "tests/test_tmp.py", sys.executable)
     assert run.verdict == "errored"
+
+
+def test_a_skipped_test_does_not_sink_a_passing_suite(repo):
+    """362 passed and 1 skipped is a passing suite. Treating it as SKIPPED made
+    `verdict == PASSED` read a healthy run as a failure."""
+    (repo / "tests" / "test_mixed.py").write_text(
+        "import pytest\n\n"
+        "def test_ok():\n    assert True\n\n"
+        "@pytest.mark.skip(reason='deliberate')\n"
+        "def test_skipped():\n    assert False\n")
+    run = run_pytest(repo, "tests/test_mixed.py", sys.executable)
+    assert run.verdict == PASSED
+
+
+def test_everything_skipped_is_not_a_pass(repo):
+    (repo / "tests" / "test_all_skipped.py").write_text(
+        "import pytest\n\n"
+        "@pytest.mark.skip(reason='deliberate')\n"
+        "def test_one():\n    assert False\n")
+    run = run_pytest(repo, "tests/test_all_skipped.py", sys.executable)
+    assert run.verdict == "skipped"

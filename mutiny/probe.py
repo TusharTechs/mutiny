@@ -29,6 +29,10 @@ def pytest_runtest_makereport(item, call):
     elif report.outcome == "failed":
         # setup/teardown failure -> the test never really ran
         _STATUS.setdefault(nodeid, "error:" + report.when)
+    elif report.outcome == "skipped":
+        # a skipped test is skipped during setup and never reaches the call
+        # phase, so without this it is invisible rather than recorded
+        _STATUS.setdefault(nodeid, "skipped")
 
 
 def pytest_collectreport(report):
