@@ -265,3 +265,41 @@ precisely: across the corpora measured so far, every divergence reported has
 been reproducible and attributable to the change under test. This one was
 initially *scored* as a false alarm by a grader that assumes a passing suite
 implies preserved behaviour — the assumption the tool is built to doubt.
+
+## A false positive I built myself
+
+The first run of the pull-request corpus reported a behaviour change in
+`rich.divide_line`, with a witness that looked damning:
+
+    divide_line("abcdefghij", 0)
+      before: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      after:  TypeError: chop_cells() got an unexpected keyword argument
+
+No released version of rich can raise that. The pull request changed two files —
+`rich/_wrap.py`, where `divide_line` lives, and `rich/cells.py`, where
+`chop_cells` lives — and MUTINY overlaid only the first. The "after" side was
+running the new caller against the old helper: a combination that exists in no
+commit, on no branch, in nobody's checkout.
+
+The witness was real. The state it came from was not, and that is a worse
+failure than a wrong answer, because the evidence looks exactly as solid as a
+true finding does.
+
+The overlay is now the whole changed set, applied together. Re-running the same
+pull request afterwards:
+
+    divide_line   0 divergent of 15
+    words         0 divergent of 15
+    chop_cells    9 divergent of 15
+
+        chop_cells("你好", 3)     ['好', '你'] → ['你', '好']
+        chop_cells("ab", 2)      ['ba']      → ['ab']
+
+The artefact is gone, and what remains is the function the pull request set out
+to fix — "double-width characters disappearing when wrapping" — located among
+three candidates without being told which one mattered.
+
+This is the sixth cause of false findings on this list and the first that was
+architectural rather than environmental. The other five were things the world
+does that the comparison had to be taught to ignore. This one was the comparison
+constructing a world of its own.

@@ -281,10 +281,20 @@ def _verify_review(
     yield _event("checkpoint", seconds=round(time.monotonic() - started, 1),
                  kib=executor.archive_bytes // 1024, mode=executor.install_mode)
 
+    # The whole changed set, applied together. A pull request is one state, not
+    # a menu of files: rich#3180 changed divide_line and the chop_cells it calls,
+    # and overlaying only the first produced a confident TypeError that no
+    # version of that library could ever raise.
+    overlay: dict[str, bytes] = {}
+    for path in review.paths:
+        try:
+            overlay[path] = head_bytes(path)
+        except (OSError, RuntimeError):
+            continue  # deleted in head; nothing to overlay
+
     findings = 0
     for target in review.targets:
         yield _event("function", name=target.qualname, path=target.path)
-        overlay = {target.path: head_bytes(target.path)}
         result: dict[str, Any] = {}
         for event in _probe_and_compare(
             client=client, repo=deps_repo, module=target.module, qualname=target.qualname,

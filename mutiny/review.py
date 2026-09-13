@@ -44,6 +44,11 @@ class Review:
     head: str
     targets: list[Target] = field(default_factory=list)
     skipped: list[tuple[str, str]] = field(default_factory=list)
+    # Every source file the change touched, not only the ones holding a target.
+    # The "after" side has to be a state that actually existed: overlaying one
+    # file of a multi-file change runs new code against its old helpers, which
+    # produces divergences that are artefacts of the overlay and nothing else.
+    paths: list[str] = field(default_factory=list)
 
 
 def resolve(repo: Path, ref: str) -> str:
@@ -129,7 +134,7 @@ def _plan(
     max_targets: int,
 ) -> Review:
     """Shared by both planners: what differs, and which of it can be probed."""
-    review = Review(base=base, head=head)
+    review = Review(base=base, head=head, paths=[c.path for c in changes])
 
     for changed in changes:
         head_source = read_head(changed.path)

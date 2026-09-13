@@ -40,10 +40,13 @@ body {
   font-family: var(--mono);
   font-size: 26px;
   font-weight: 600;
-  letter-spacing: 0.22em;
   margin: 0 0 14px;
+  /* letter-spacing lives on .word: on the h1 it also spaces the mark away
+     from the text, which is not the same decision. */
+  letter-spacing: normal;
 }
-.wordmark span { color: var(--accent); }
+.wordmark .word { letter-spacing: 0.22em; }
+.wordmark .dot { color: var(--accent); }
 .thesis {
   margin: 0;
   max-width: 62ch;
@@ -262,5 +265,5 @@ body {
 
 .wordmark .mark {
   vertical-align: -0.32em;
-  margin-right: 0.5rem;
+  margin-right: 10px;
 }

@@ -1,0 +1,65 @@
+[
+  {
+    "repo": "Textualize/rich",
+    "number": 4070,
+    "title": "perf: reduce Console and RichHandler import time by deferring unused imports",
+    "claim": "no-claim",
+    "outcome": "preserved",
+    "functions": 3,
+    "probes": 44,
+    "divergences": 0,
+    "witnesses": [],
+    "summary": "",
+    "install_mode": "editable install",
+    "seconds": 91.7,
+    "cost": 0.015,
+    "detail": ""
+  },
+  {
+    "repo": "Textualize/rich",
+    "number": 3180,
+    "title": "Fix double-width characters disappearing when wrapping",
+    "claim": "fix",
+    "outcome": "divergence",
+    "functions": 3,
+    "probes": 45,
+    "divergences": 15,
+    "witnesses": [
+      {
+        "input": "divide_line(\"abcdefghij\", 0)",
+        "before": "[1, 2, 3, 4, 5, 6, 7, 8, 9]",
+        "after": "TypeError: chop_cells() got an unexpected keyword argument 'width'"
+      },
+      {
+        "input": "divide_line(\"\ud83d\ude00\ud83d\ude03\ud83d\ude04\ud83d\ude01\ud83d\ude06\", 5)",
+        "before": "[2, 4]",
+        "after": "TypeError: chop_cells() got an unexpected keyword argument 'width'"
+      },
+      {
+        "input": "divide_line(\"abcdefghij\", 5)",
+        "before": "[5]",
+        "after": "TypeError: chop_cells() got an unexpected keyword argument 'width'"
+      },
+      {
+        "input": "chop_cells(\"\u4f60\u597d\", 4)",
+        "before": "['\u597d\u4f60']",
+        "after": "['\u4f60\u597d']"
+      },
+      {
+        "input": "chop_cells(\"a\\tb\", 2)",
+        "before": "['b\\ta']",
+        "after": "['a\\tb']"
+      },
+      {
+        "input": "chop_cells(\"e\\u0301\", 0)",
+        "before": "['\u0301', 'e']",
+        "after": "['', 'e', '\u0301']"
+      }
+    ],
+    "summary": "The change causes divide_line to raise a TypeError: chop_cells() got an unexpected keyword argument 'width' whenever it encounters a word longer than the given width and fold is true (the branch that calls chop_cells with a width= argument). Previously, in those same cases the function returned a list of integer split positions (e.g., [1,2,3,4,5,6,7,8,9] for divide_line(\"abcdefghij\",0)). All other inputs that do not trigger the folding branch continue to behave as before, but the shown examples all hit the new erroneous call and thus now raise an exception instead of returning a list.",
+    "install_mode": "editable install",
+    "seconds": 88.6,
+    "cost": 0.008,
+    "detail": ""
+  }
+]

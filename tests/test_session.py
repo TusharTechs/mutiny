@@ -65,3 +65,30 @@ def test_changed_between_matches_what_git_would_report(tmp_path):
     by_tree = {c.path: c.lines for c in changed_between(before, after)}
 
     assert by_git == by_tree == {"pkg/m.py": (2, 3)}
+
+
+def test_overlay_applies_every_changed_file_not_just_the_target(tmp_path):
+    """A change is one state. Applying half of it invents one that never existed.
+
+    rich#3180 changed `divide_line` and the `chop_cells` it calls. Overlaying
+    only the file holding the target ran the new caller against the old helper
+    and reported a confident TypeError that no released version of that library
+    could raise. The witness was real; the state it came from was not.
+    """
+    from mutiny.review import plan_between
+
+    before, after = tmp_path / "before", tmp_path / "after"
+    for tree, helper_arg in ((before, "def helper(text):"), (after, "def helper(text, *, upper=False):")):
+        (tree / "pkg").mkdir(parents=True)
+        (tree / "pkg" / "__init__.py").write_text("")
+        (tree / "pkg" / "helper.py").write_text(
+            f"{helper_arg}\n    return text\n")
+    (before / "pkg" / "caller.py").write_text(
+        "from .helper import helper\n\n\ndef call(text):\n    return helper(text)\n")
+    (after / "pkg" / "caller.py").write_text(
+        "from .helper import helper\n\n\ndef call(text):\n    return helper(text, upper=True)\n")
+
+    review = plan_between(before, after, "b", "h")
+    assert set(review.paths) == {"pkg/caller.py", "pkg/helper.py"}, (
+        "both changed files must be in the overlay set, or the 'after' run is "
+        f"a state that never existed: {review.paths}")
