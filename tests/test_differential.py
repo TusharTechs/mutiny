@@ -84,3 +84,18 @@ def test_a_genuinely_stable_divergence_still_survives_confirmation():
 
     confirmed, flaky = confirm(compare(before, after), run_before, run_after)
     assert len(confirmed) == 1 and flaky == []
+
+
+def test_the_driver_provides_what_the_prompt_promises():
+    """Probes run in the target module's globals and can only name what it imported.
+
+    The generator is instructed to drive coroutines with asyncio.run(...). That
+    was a promise the driver did not keep unless the module happened to import
+    asyncio itself, so every such probe died on NameError and two full rounds of
+    generation produced nothing.
+    """
+    from mutiny.differential import DRIVER
+    from mutiny.inputs import ASYNC
+
+    assert 'base.setdefault("asyncio"' in DRIVER
+    assert "asyncio.run" in ASYNC, "the instruction and the namespace must agree"

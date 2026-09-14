@@ -140,6 +140,18 @@ _bootstrap()
 mod = importlib.import_module(module_name)
 base = dict(vars(mod))
 
+# A probe is evaluated in the target module's own globals, so it can only name
+# what that module imported. The generator is told to drive coroutines with
+# asyncio.run(...), which was a promise the driver did not keep unless the
+# module happened to import asyncio itself -- every such probe died on NameError
+# and two rounds of generation produced nothing. setdefault so a module that
+# binds these names to something of its own still wins.
+import asyncio as _asyncio
+
+base.setdefault("asyncio", _asyncio)
+base.setdefault("math", __import__("math"))
+base.setdefault("datetime", __import__("datetime"))
+
 def run(snippet, ns):
     """Statements, then a final expression whose value is the observation.
 
