@@ -25,39 +25,43 @@ from mutiny.session import verify_url
 
 ROOT = Path(__file__).resolve().parent
 
-# Four things worth showing: a real bug fix whose behaviour change MUTINY finds,
-# a second one on a different library, a repository whose rewrite is clean, and
-# something large enough to answer "does this work on real code?".
+# The first card has to be the case the tool exists for. The earlier set led
+# with a bug fix, which the intent check now correctly labels "as described" --
+# a visitor clicked through four examples and saw three null results and one
+# change that the pull request had already announced, and learned nothing about
+# why they would want this.
 EXAMPLES = [
     {
-        "id": "semver-bump-build",
-        "title": "A real bug fix, reviewed",
-        "blurb": "bump_build() silently returned an unchanged version. "
-                 "MUTINY finds the inputs where before and after disagree.",
-        "url": "https://github.com/python-semver/python-semver/pull/480",
-        "expect": "behaviour change",
+        "id": "tenacity-truthiness",
+        "title": "A refactor that wasn't",
+        "blurb": "The title says refactor. The tests pass. MUTINY finds the "
+                 "input where the old code returned 0.0 and the new code raises.",
+        "shows": "a behaviour change the pull request does not mention",
+        "url": "https://github.com/jd/tenacity/pull/679",
     },
     {
-        "id": "cachetools-maxsize",
-        "title": "A guard added to a constructor",
-        "blurb": "Rejecting a negative maxsize. Does it change anything else?",
-        "url": "https://github.com/tkem/cachetools/pull/413",
-        "expect": "behaviour change",
+        "id": "semver-bump-build",
+        "title": "A fix doing what it says",
+        "blurb": "A real bug fix. Behaviour changes, the description predicted "
+                 "it, and MUTINY says so rather than crying wolf.",
+        "shows": "a behaviour change, as described",
+        "url": "https://github.com/python-semver/python-semver/pull/480",
     },
     {
         "id": "rich-style",
-        "title": "A rewrite that preserves behaviour",
-        "blurb": "Nemotron rewrites Style.__str__ and MUTINY agrees it is the "
-                 "same function. Silence is the harder result to earn.",
+        "title": "An AI rewrite that holds up",
+        "blurb": "Nemotron rewrites Style.__str__ and every generated input "
+                 "agrees across both versions. Silence is the harder result.",
+        "shows": "no behaviour change",
         "url": "https://github.com/Textualize/rich",
-        "expect": "preserved",
     },
     {
         "id": "django",
         "title": "Django, 2932 files",
-        "blurb": "Installed and executed in a Nebius sandbox, not on this server.",
+        "blurb": "Installed and executed in a Nebius sandbox, never on this "
+                 "server. Real frameworks, not a toy repository.",
+        "shows": "that this works at scale",
         "url": "https://github.com/django/django",
-        "expect": "preserved",
     },
 ]
 

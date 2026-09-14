@@ -344,6 +344,9 @@ async function boot() {
     button.appendChild(el("span", "repo", slugOf(example.url)));
     button.appendChild(el("h3", null, example.title));
     button.appendChild(el("p", null, example.blurb));
+    if (example.shows) {
+      button.appendChild(el("p", "shows", "shows " + example.shows));
+    }
     button.addEventListener("click", () => start(example.id, button));
     cards.appendChild(button);
   }

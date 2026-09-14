@@ -168,6 +168,35 @@ MUTATORS = {"__setitem__", "__delitem__", "__iadd__", "append", "add", "update",
             "expire", "evict", "put", "set"}
 
 
+ASYNC = """`{qualname}` is a coroutine function. Calling it returns a coroutine
+that does nothing until it is awaited, and a bare call reveals no behaviour at
+all. Drive each one to completion inside the expression:
+
+    asyncio.run(Thing().method(1, 2))
+
+`asyncio` is available. Every expression for this target must await it this way,
+or it tests nothing.
+"""
+
+
+def is_async(full_source: str, qualname: str) -> bool:
+    """Is the target a coroutine function?
+
+    A probe is a single expression, and calling a coroutine function without
+    awaiting it returns a coroutine object -- identical before and after any
+    change to the body, because none of the body has run. Three attempts at
+    tenacity's AsyncRetrying._run_wait produced zero usable inputs and a minute
+    of wasted generation before this was noticed.
+    """
+    from .source import find_function
+
+    try:
+        node = find_function(ast.parse(full_source), qualname)
+    except SyntaxError:
+        return False
+    return isinstance(node, ast.AsyncFunctionDef)
+
+
 def is_stateful(full_source: str, qualname: str) -> bool:
     """Does this method belong to a type whose behaviour accumulates?
 
@@ -278,8 +307,10 @@ def generate(
             {"role": "user", "content": USER.format(
                 module=module, qualname=qualname, source=source, n=n,
                 receivers=receivers,
-                stateful=(STATEFUL.format(owner=qualname.rsplit(".", 2)[-2])
-                          if stateful and "." in qualname else ""),
+                stateful=(
+                    (STATEFUL.format(owner=qualname.rsplit(".", 2)[-2])
+                     if stateful and "." in qualname else "")
+                    + (ASYNC.format(qualname=qualname) if awaitable else "")),
                 change=CHANGE.format(diff=diff[:4000]) if diff else "",
                 extra=(hint + "\n\n") if hint else "")},
         ],
@@ -329,6 +360,7 @@ def generate_validated(
     subclasses: list[str] | None = None,
     diff: str = "",
     stateful: bool = False,
+    awaitable: bool = False,
     model: str = SUPER,
     on_progress=None,
 ):
@@ -364,7 +396,7 @@ def generate_validated(
         for _ in range(batches):
             produced += generate(client, module, qualname, source, n=batch, hint=hint,
                                  model=model, subclasses=subclasses, diff=diff,
-                                 stateful=stateful)
+                                 stateful=stateful, awaitable=awaitable)
         exprs = [e for e in dict.fromkeys(produced) if e not in seen]
         if not exprs:
             if attempt == rounds:

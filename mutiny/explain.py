@@ -77,21 +77,27 @@ class Explanation:
 
 
 INTENT_SYSTEM = """You are told what a code change SAYS it does, and shown a
-behaviour difference that was measured by running both versions.
+behaviour difference that was measured by running both versions of the code.
 
-Answer one question: is the measured difference something the description
-predicts?
+Answer one question: would a reviewer reading that description EXPECT this
+difference?
 
-Answer YES if the description mentions this behaviour, or if the difference is
-an obvious consequence of what it says it is doing. A change that says it fixes
-a function returning the wrong value predicts that function returning a
-different value.
+Answer NO — this is the important case — when the description presents the
+change as behaviour-preserving. Refactor, cleanup, tidy-up, rename, simplify,
+style, typing, "no functional change", "purely internal". Such a description
+predicts that nothing observable changes, so ANY measured difference contradicts
+it. Answer NO even when the description discusses exactly the code that changed,
+and even when it argues the old behaviour was unreachable: the measurement shows
+it was reachable, which is the reviewer's news. Discussing the code is not the
+same as predicting the difference.
 
-Answer NO if the description claims no behaviour change at all — a refactor, a
-cleanup, a rename, a typing change — or describes something unrelated to what
-was measured.
+Answer YES when the description tells the reader to expect a different result. A
+change that says it fixes a function returning the wrong value predicts that
+function returning a different value. A change that says it adds validation
+predicts a new error.
 
-Answer UNCLEAR if the description is empty, or too vague to predict anything.
+Answer UNCLEAR only when the description is empty or says nothing about what the
+code does.
 
 Reply with exactly one word: YES, NO, or UNCLEAR."""
 

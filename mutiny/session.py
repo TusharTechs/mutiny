@@ -31,7 +31,8 @@ from .explain import explain
 # fetch clones with the git binary, which a serverless runtime does not have.
 # It stays for local experiments; everything reached from a URL goes via remote.
 from .fetch import FetchError
-from .inputs import generate_validated, is_stateful, receiver_candidates
+from .inputs import (generate_validated, is_async, is_stateful,
+                     receiver_candidates)
 from .models import NemotronClient
 from .sandbox import SandboxExecutor, available, file_at, tarball, tarball_at
 from .scenarios import construction_examples
@@ -530,6 +531,7 @@ def _probe_and_compare(
                 probe=lambda e: runner.run(module, e), n=probes,
                 subclasses=receiver_candidates(base_source, qualname),
                 stateful=is_stateful(base_source, qualname),
+                awaitable=is_async(base_source, qualname),
                 diff=diff_text,
                 covering_tests=examples,
                 on_progress=lambda **fields: updates.put(fields),

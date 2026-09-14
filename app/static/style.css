@@ -352,3 +352,14 @@ body {
 .flag.alarm { color: var(--fail); font-weight: 600; }
 .flag.expected { color: var(--pass); }
 .finding.alarming { border-left-color: var(--fail); }
+
+/* What the visitor will actually see, so a click is not a lottery. */
+.card .shows {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
