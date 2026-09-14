@@ -170,8 +170,6 @@ def _sse(events) -> StreamingResponse:
         headers={
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
-            # Compressing a stream means buffering it.
-            "Content-Encoding": "identity",
         },
     )
 
