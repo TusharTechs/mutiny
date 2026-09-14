@@ -21,10 +21,23 @@ function clock() {
   $("elapsed").textContent = `${((Date.now() - started) / 1000).toFixed(0)}s`;
 }
 
+// Some hosts buffer a streamed response and deliver it whole when the request
+// finishes — measured on this deployment, every event of a 36 second run
+// arrived in the same instant. Where that happens the timeline is a record of
+// what happened rather than a view of it happening, and the honest thing is to
+// say so while the reader waits, instead of animating a fiction.
+let streaming = false;
+
 function activity(text) {
   if (!started) {
     started = Date.now();
     ticker = setInterval(clock, 200);
+  }
+  if (!streaming && Date.now() - started > 4000) {
+    // Nothing has arrived in four seconds, so this response is not reaching us
+    // as it is produced.
+    text = "running — a typical run takes 40 to 120 seconds, and this host "
+         + "delivers the result in one piece";
   }
   $("activity-text").textContent = text;
   $("activity").hidden = false;
@@ -203,6 +216,7 @@ function start(id, button) {
 function wire(source) {
   stream = source;
   started = 0;
+  streaming = false;
   if (ticker) clearInterval(ticker);
   $("timeline").replaceChildren();
   activity("starting");
@@ -212,6 +226,7 @@ function wire(source) {
 
   stream.onmessage = (message) => {
     const e = JSON.parse(message.data);
+    if (Date.now() - started < 4000) streaming = true;
     switch (e.type) {
       case "status":
         activity(e.text || e.stage);
