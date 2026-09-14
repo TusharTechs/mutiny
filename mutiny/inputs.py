@@ -296,6 +296,7 @@ def generate(
     subclasses: list[str] | None = None,
     diff: str = "",
     stateful: bool = False,
+    awaitable: bool = False,
 ) -> list[str]:
     receivers = ""
     if subclasses:
