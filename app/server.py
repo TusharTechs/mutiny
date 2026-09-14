@@ -94,6 +94,18 @@ def examples() -> dict:
     }
 
 
+# An intermediary that compresses or buffers a response holds the whole thing
+# until the function returns, and a run takes a minute. Measured on the
+# deployment, every event of a 36 second run arrived in the same instant: the
+# progress display was live locally and pure decoration in production.
+#
+# The two things that reliably unstick it: refuse compression for this response,
+# and push enough bytes up front that any fixed-size buffer gives up and
+# flushes. The padding is an SSE comment, which every client ignores.
+PADDING = ":" + " " * 2048 + "\n\n"
+KEEPALIVE = ": still working\n\n"
+
+
 async def _stream_events(make_events):
     """Bridge a synchronous generator onto the event loop.
 
@@ -116,8 +128,15 @@ async def _stream_events(make_events):
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
     loop.run_in_executor(None, produce)
+    yield PADDING
     while True:
-        event = await queue.get()
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=5)
+        except asyncio.TimeoutError:
+            # Nothing to report, but silence is what a dead connection looks
+            # like, to an intermediary as much as to a reader.
+            yield KEEPALIVE
+            continue
         if event is None:
             yield "event: end\ndata: {}\n\n"
             return
@@ -148,7 +167,12 @@ def _sse(events) -> StreamingResponse:
     return StreamingResponse(
         _stream_events(events),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            # Compressing a stream means buffering it.
+            "Content-Encoding": "identity",
+        },
     )
 
 
