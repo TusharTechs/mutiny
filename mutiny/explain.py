@@ -59,9 +59,51 @@ Describe the behaviour change."""
 class Explanation:
     text: str
     cost_usd: float = 0.0
+    # Whether the change the evidence shows is one the author said they were
+    # making. None when the change described itself in no useful way.
+    described: bool | None = None
 
     def __bool__(self) -> bool:
         return bool(self.text.strip())
+
+    @property
+    def headline(self) -> str:
+        """What a reviewer should take from this, in one clause."""
+        if self.described is True:
+            return "behaves differently, as the change describes"
+        if self.described is False:
+            return "behaves differently in a way the change does not mention"
+        return "behaves differently"
+
+
+INTENT_SYSTEM = """You are told what a code change SAYS it does, and shown a
+behaviour difference that was measured by running both versions.
+
+Answer one question: is the measured difference something the description
+predicts?
+
+Answer YES if the description mentions this behaviour, or if the difference is
+an obvious consequence of what it says it is doing. A change that says it fixes
+a function returning the wrong value predicts that function returning a
+different value.
+
+Answer NO if the description claims no behaviour change at all — a refactor, a
+cleanup, a rename, a typing change — or describes something unrelated to what
+was measured.
+
+Answer UNCLEAR if the description is empty, or too vague to predict anything.
+
+Reply with exactly one word: YES, NO, or UNCLEAR."""
+
+INTENT_USER = """What the change says about itself:
+---
+{intent}
+---
+
+The measured difference in `{function}`:
+{witnesses}
+
+Does the description predict this? YES, NO, or UNCLEAR."""
 
 
 def _witness_block(divergences: list[dict], limit: int = 6) -> str:
@@ -75,6 +117,39 @@ def _witness_block(divergences: list[dict], limit: int = 6) -> str:
     return "\n".join(lines)
 
 
+def _describes(
+    client: NemotronClient, function: str, intent: str, divergences: list[dict],
+    model: str = SUPER,
+) -> bool | None:
+    """Did the change predict the difference we measured?
+
+    This is the question that makes a finding worth reading. A pull request
+    titled "fix bump_build returning an unchanged version" changing what
+    bump_build returns is the fix working, and saying "behaviour changed" about
+    it tells a reviewer nothing they did not already know. The same evidence
+    under "refactor: no functional change" is the whole point of the tool.
+    """
+    if not intent.strip():
+        return None
+    try:
+        text, _ = client.complete(
+            [{"role": "system", "content": INTENT_SYSTEM},
+             {"role": "user", "content": INTENT_USER.format(
+                 intent=intent[:1200], function=function,
+                 witnesses=_witness_block(divergences, limit=4))}],
+            model=model, max_tokens=2000, temperature=0.0,
+            tag=f"intent:{function}",
+        )
+    except Exception:  # noqa: BLE001 - the witness stands without this
+        return None
+    answer = text.strip().upper()
+    if "YES" in answer[:12]:
+        return True
+    if "NO" in answer[:12]:
+        return False
+    return None
+
+
 def explain(
     client: NemotronClient,
     function: str,
@@ -82,6 +157,7 @@ def explain(
     divergences: list[dict],
     model: str = SUPER,
     max_tokens: int = 4000,
+    intent: str = "",
 ) -> Explanation:
     """One or two sentences describing what the witnesses show."""
     if not divergences:
@@ -101,7 +177,8 @@ def explain(
     cleaned = " ".join(text.strip().split())
     for fence in ("```", "`"):
         cleaned = cleaned.replace(fence, "")
-    return Explanation(cleaned[:600], getattr(call, "cost_usd", 0.0))
+    described = _describes(client, function, intent, divergences, model=model)
+    return Explanation(cleaned[:600], getattr(call, "cost_usd", 0.0), described)
 
 
 def summarise_review(findings: list[tuple[str, str]]) -> str:

@@ -53,6 +53,10 @@ class Change:
     head: str
     paths: tuple[str, ...]
     pr: int | None = None
+    # What the change says about itself. A divergence means something quite
+    # different depending on whether the author predicted it.
+    title: str = ""
+    body: str = ""
 
     @property
     def slug(self) -> str:
@@ -149,7 +153,9 @@ def pull_request(owner: str, repo: str, number: int) -> Change:
     merge_base = comparison.get("merge_base_commit", {}).get("sha") or base_ref
     paths = tuple(f["filename"] for f in comparison.get("files", [])
                   if f.get("filename", "").endswith(".py"))
-    return Change(owner, repo, merge_base, head_sha, paths, pr=number)
+    return Change(owner, repo, merge_base, head_sha, paths, pr=number,
+                  title=(pr.get("title") or "")[:300],
+                  body=(pr.get("body") or "")[:1500])
 
 
 def default_branch(owner: str, repo: str) -> str:

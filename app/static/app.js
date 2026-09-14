@@ -111,7 +111,9 @@ function split(before, after) {
 }
 
 function renderResult(e) {
-  const box = el("div", "finding" + (e.divergences.length ? "" : " clean"));
+  const box = el("div", "finding"
+    + (e.divergences.length ? "" : " clean")
+    + (e.described === false ? " alarming" : ""));
   box.appendChild(el("h3", null, e.function));
 
   if (!e.divergences.length) {
@@ -121,6 +123,17 @@ function renderResult(e) {
     return;
   }
 
+  // A behaviour change is only news when the change did not predict it. A pull
+  // request titled "fix X returning the wrong value" changing what X returns is
+  // the fix working, and saying "behaviour changed" about it tells a reviewer
+  // nothing they did not already know.
+  if (e.described === false) {
+    box.appendChild(el("p", "flag alarm",
+      "This is not described by the change."));
+  } else if (e.described === true) {
+    box.appendChild(el("p", "flag expected",
+      "The change describes this. It is doing what it says."));
+  }
   box.appendChild(el("div", "where",
     `${e.divergences.length} of ${e.probes} probes disagree`));
   if (e.summary) box.appendChild(el("p", "summary", e.summary));

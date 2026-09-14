@@ -341,3 +341,14 @@ body {
   border-radius: 2px;
   padding: 0 2px;
 }
+
+/* Whether the change predicted its own behaviour difference. */
+.flag {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+}
+.flag.alarm { color: var(--fail); font-weight: 600; }
+.flag.expected { color: var(--pass); }
+.finding.alarming { border-left-color: var(--fail); }

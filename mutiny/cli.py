@@ -166,8 +166,19 @@ class Render:
                   f"{e['probes']} probes ran on both versions and agreed{c['reset']}\n")
             return
         self.findings += 1
-        print(f"  {c['red']}{c['bold']}behaviour changed{c['reset']} — "
-              f"{len(e['divergences'])} of {e['probes']} probes disagree\n")
+        described = e.get("described")
+        if described is False:
+            # The case the whole tool exists for: the change said it was not
+            # going to do this.
+            print(f"  {c['red']}{c['bold']}NOT DESCRIBED BY THIS CHANGE{c['reset']} — "
+                  f"{len(e['divergences'])} of {e['probes']} probes disagree\n")
+        elif described is True:
+            print(f"  {c['green']}as described{c['reset']} — behaviour changed on "
+                  f"{len(e['divergences'])} of {e['probes']} probes, and the change "
+                  f"says so\n")
+        else:
+            print(f"  {c['red']}{c['bold']}behaviour changed{c['reset']} — "
+                  f"{len(e['divergences'])} of {e['probes']} probes disagree\n")
         if e.get("summary"):
             for line in _wrap(e["summary"], 76):
                 print(f"    {c['bold']}{line}{c['reset']}")

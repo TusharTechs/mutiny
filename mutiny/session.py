@@ -216,6 +216,7 @@ def verify_trees(
     head: str = "after",
     paths: tuple[str, ...] | None = None,
     name: str = "",
+    intent: str = "",
     probes: int = 30,
     forks: int = 8,
     cap: float = 5.0,
@@ -240,6 +241,7 @@ def verify_trees(
         head_bytes=lambda path: (after / path).read_bytes(),
         hunk_text=lambda path: hunk_between(before, after, path),
         probes=probes, forks=forks, cap=cap, python=python, started=started,
+        intent=intent,
     )
 
 
@@ -256,6 +258,7 @@ def _verify_review(
     cap: float,
     python: str,
     started: float,
+    intent: str = "",
 ) -> Iterator[Event]:
     """Everything a reviewed change does once its two revisions are readable.
 
@@ -305,7 +308,7 @@ def _verify_review(
             diff_text=hunk_text(target.path),
             probes=probes, forks=forks, use_sandbox=True, python=python,
             started=started, opening=opening, archive=None, executor=executor,
-            emit_verdict=False, sink=result,
+            emit_verdict=False, sink=result, intent=intent,
         ):
             yield event
         if result.get("divergences"):
@@ -351,6 +354,7 @@ def verify_url(
                 checkout.before, checkout.after,
                 base=target.base, head=target.head, paths=target.paths,
                 name=f"{target.owner}/{target.repo}",
+                intent=f"{target.title}\n\n{target.body}".strip(),
                 probes=probes, forks=forks, cap=cap, max_functions=max_functions)
         finally:
             if not keep:
@@ -484,7 +488,7 @@ def _probe_and_compare(
     *, client, repo, module, qualname, base_source, overlay, diff_text,
     probes, forks, use_sandbox, python, started, opening, archive,
     executor: SandboxExecutor | None = None, emit_verdict: bool = True,
-    sink: dict[str, Any] | None = None,
+    sink: dict[str, Any] | None = None, intent: str = "",
 ) -> Iterator[Event]:
     if executor is None and use_sandbox:
         ok, why = available()
@@ -582,15 +586,21 @@ def _probe_and_compare(
          "kind": d.kind}
         for d in divergences
     ]
-    summary = ""
+    summary, headline, described = "", "", None
     if payload:
-        yield _event("status", stage="explain", text="describing the change")
-        summary = explain(client, qualname, diff_text, payload).text
+        yield _event("status", stage="explain",
+                     text=("checking the difference against what the change says"
+                           if intent else "describing the change"))
+        explanation = explain(client, qualname, diff_text, payload, intent=intent)
+        summary = explanation.text
+        headline = explanation.headline
+        described = explanation.described
 
     if sink is not None:
         sink["divergences"] = payload
     yield _event("result", function=qualname, divergences=payload,
-                 agreed=agreed, probes=len(generated), summary=summary)
+                 agreed=agreed, probes=len(generated), summary=summary,
+                 headline=headline, described=described)
 
     if emit_verdict:
         yield _event("verdict", changed=bool(divergences), functions=1,
