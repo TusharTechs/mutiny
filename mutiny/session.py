@@ -17,7 +17,8 @@ import tempfile
 import threading
 import time
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import (FIRST_COMPLETED, ThreadPoolExecutor,
+                                as_completed, wait)
 from pathlib import Path
 from typing import Any
 
@@ -299,21 +300,79 @@ def _verify_review(
         except (OSError, RuntimeError):
             continue  # deleted in head; nothing to overlay
 
+    # Functions of one change are independent: each generates its own inputs and
+    # runs them in its own forks. Checking them one after another made a three
+    # function pull request take 134 seconds, and two of those functions could
+    # never produce anything -- one returns a decorator, the other is a
+    # coroutine. Nobody should wait through a dead end to reach the finding.
+    #
+    # Each function's events are collected and released as a block, so the
+    # output still reads as one function at a time instead of three interleaved.
     findings = 0
-    for target in review.targets:
-        yield _event("function", name=target.qualname, path=target.path)
-        result: dict[str, Any] = {}
+    if len(review.targets) > 1:
+        yield _event("status", stage="probes",
+                     text=f"checking {len(review.targets)} functions at once")
+
+    # Progress is reported as it happens; findings are held until the function
+    # they belong to is finished. Streaming everything would interleave three
+    # functions' witnesses into nonsense, and buffering everything would leave
+    # the page silent for a minute.
+    live: queue.Queue = queue.Queue()
+    parallel = min(len(review.targets), 4)
+
+    def check(target) -> tuple[list[Event], dict[str, Any]]:
+        collected: list[Event] = [
+            _event("function", name=target.qualname, path=target.path)]
+        sink: dict[str, Any] = {}
         for event in _probe_and_compare(
-            client=client, repo=deps_repo, module=target.module, qualname=target.qualname,
-            base_source=target.base_source, overlay=overlay,
-            diff_text=hunk_text(target.path),
+            client=client, repo=deps_repo, module=target.module,
+            qualname=target.qualname, base_source=target.base_source,
+            overlay=overlay, diff_text=hunk_text(target.path),
             probes=probes, forks=forks, use_sandbox=True, python=python,
             started=started, opening=opening, archive=None, executor=executor,
-            emit_verdict=False, sink=result, intent=intent,
+            emit_verdict=False, sink=sink, intent=intent,
         ):
-            yield event
-        if result.get("divergences"):
-            findings += 1
+            if event.get("type") == "status" and parallel > 1:
+                # Say which function it is about, now that several are in flight.
+                live.put({**event,
+                          "text": f"{target.qualname}: {event.get('text', '')}"})
+            elif event.get("type") == "status":
+                live.put(event)
+            else:
+                collected.append(event)
+        return collected, sink
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        running = {pool.submit(check, t): t for t in review.targets}
+        pending = set(running)
+        while pending:
+            while True:
+                try:
+                    yield live.get_nowait()
+                except queue.Empty:
+                    break
+            done, pending = wait(pending, timeout=0.2, return_when=FIRST_COMPLETED)
+            for future in done:
+                try:
+                    events, result = future.result()
+                except Exception as exc:  # noqa: BLE001 - one must not sink the rest
+                    yield _event("error",
+                                 message=f"{running[future].qualname}: "
+                                         f"{type(exc).__name__}: {exc}"[:200])
+                    continue
+                while True:
+                    try:
+                        yield live.get_nowait()
+                    except queue.Empty:
+                        break
+                yield from events
+                if result.get("divergences"):
+                    findings += 1
+        while True:
+            try:
+                yield live.get_nowait()
+            except queue.Empty:
+                break
 
     yield _event("verdict", changed=bool(findings), functions=len(review.targets),
                  findings=findings, seconds=round(time.monotonic() - started, 1),

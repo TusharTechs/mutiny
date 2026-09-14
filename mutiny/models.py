@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -69,6 +70,11 @@ class Call:
 class Ledger:
     path: Path
     calls: list[Call] = field(default_factory=list)
+    # Functions of a change are checked concurrently and every one of them bills
+    # against this file. Two threads appending and rewriting it at once lose
+    # calls and can leave truncated JSON behind.
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False,
+                                  compare=False)
 
     def load(self) -> "Ledger":
         if self.path.is_file():
@@ -83,8 +89,9 @@ class Ledger:
         )
 
     def add(self, call: Call) -> None:
-        self.calls.append(call)
-        self.save()
+        with self._lock:
+            self.calls.append(call)
+            self.save()
 
     @property
     def total_usd(self) -> float:
