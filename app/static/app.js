@@ -82,6 +82,34 @@ function resetForks() {
   $("forks-panel").hidden = true;
 }
 
+// Two reprs that differ in one field are a spot-the-difference puzzle:
+//   before Version(major=1, minor=0, patch=0, prerelease=None, build='alpha')
+//   after  Version(major=1, minor=0, patch=0, prerelease=None, build='alpha.0')
+// Trimming the shared head and tail leaves the part that actually changed, which
+// is the whole point of showing the pair at all.
+function split(before, after) {
+  let head = 0;
+  const max = Math.min(before.length, after.length);
+  while (head < max && before[head] === after[head]) head += 1;
+
+  let tail = 0;
+  while (tail < max - head
+         && before[before.length - 1 - tail] === after[after.length - 1 - tail]) {
+    tail += 1;
+  }
+
+  // Nothing shared, or shared so little that highlighting adds noise rather
+  // than removing it — show the values plainly.
+  if (head + tail < 4) return [[ "", before, "" ], [ "", after, "" ]];
+
+  return [
+    [before.slice(0, head), before.slice(head, before.length - tail),
+     before.slice(before.length - tail)],
+    [after.slice(0, head), after.slice(head, after.length - tail),
+     after.slice(after.length - tail)],
+  ];
+}
+
 function renderResult(e) {
   const box = el("div", "finding" + (e.divergences.length ? "" : " clean"));
   box.appendChild(el("h3", null, e.function));
@@ -100,10 +128,15 @@ function renderResult(e) {
   for (const d of e.divergences.slice(0, 4)) {
     const w = el("div", "witness");
     w.appendChild(el("code", "probe", d.input));
-    for (const side of ["before", "after"]) {
+    const [beforeParts, afterParts] = split(String(d.before), String(d.after));
+    for (const [side, parts] of [["before", beforeParts], ["after", afterParts]]) {
       const row = el("div", "row " + side);
       row.appendChild(el("b", null, side));
-      row.appendChild(el("span", null, String(d[side])));
+      const value = el("span", "value");
+      value.appendChild(el("span", "same", parts[0]));
+      value.appendChild(el("mark", null, parts[1]));
+      value.appendChild(el("span", "same", parts[2]));
+      row.appendChild(value);
       w.appendChild(row);
     }
     box.appendChild(w);

@@ -23,6 +23,37 @@ BOLD, DIM, RED, GREEN, YELLOW, CYAN, RESET = (
     "\033[1m", "\033[2m", "\033[31m", "\033[32m", "\033[33m", "\033[36m", "\033[0m")
 
 
+def _emphasise(before: str, after: str, c: dict) -> tuple[str, str]:
+    """Dim what the two values share, so the part that differs stands out.
+
+    Two reprs differing in one field are a spot-the-difference puzzle:
+
+        before  Version(major=1, minor=0, patch=0, prerelease=None, build='alpha')
+        after   Version(major=1, minor=0, patch=0, prerelease=None, build='alpha.0')
+
+    Trimming the shared head and tail leaves what actually changed, which is the
+    only reason to print the pair together.
+    """
+    limit = min(len(before), len(after))
+    head = 0
+    while head < limit and before[head] == after[head]:
+        head += 1
+    tail = 0
+    while tail < limit - head and before[-1 - tail] == after[-1 - tail]:
+        tail += 1
+
+    if head + tail < 4:  # too little in common for trimming to help
+        return (f"{c['green']}{before}{c['reset']}", f"{c['red']}{after}{c['reset']}")
+
+    def paint(text: str, colour: str) -> str:
+        middle = text[head:len(text) - tail] if tail else text[head:]
+        return (f"{c['dim']}{text[:head]}{c['reset']}"
+                f"{colour}{c['bold']}{middle}{c['reset']}"
+                f"{c['dim']}{text[len(text) - tail:] if tail else ''}{c['reset']}")
+
+    return paint(before, c["green"]), paint(after, c["red"])
+
+
 def _wrap(text: str, width: int) -> list[str]:
     lines, current = [], ""
     for word in text.split():
@@ -143,8 +174,9 @@ class Render:
             print()
         for d in e["divergences"][: self.show]:
             print(f"    {c['dim']}{d['input']}{c['reset']}")
-            print(f"      before  {c['green']}{d['before']}{c['reset']}")
-            print(f"      after   {c['red']}{d['after']}{c['reset']}")
+            before, after = _emphasise(str(d["before"]), str(d["after"]), c)
+            print(f"      before  {before}")
+            print(f"      after   {after}")
             if d["kind"] == "message":
                 print(f"      {c['dim']}(only the error wording differs){c['reset']}")
         remaining = len(e["divergences"]) - self.show

@@ -325,3 +325,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .activity .spin { animation: none; opacity: 0.9; }
 }
+
+/* The part that actually differs, in a pair of otherwise identical values. */
+.row .value { white-space: pre-wrap; word-break: break-word; }
+.row .value .same { color: var(--faint); }
+.row.before .value mark {
+  background: rgba(229, 106, 106, 0.16);
+  color: var(--fail);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.row.after .value mark {
+  background: rgba(90, 199, 126, 0.16);
+  color: var(--pass);
+  border-radius: 2px;
+  padding: 0 2px;
+}
