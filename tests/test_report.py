@@ -65,3 +65,32 @@ def test_a_failure_is_reported_as_ours():
     body = render(report)
     assert "could not check" in body
     assert "a problem with MUTINY, not with the change" in body
+
+
+def _with_contract(states, quote="The wait argument defaults to no waiting at all "
+                                 "between attempts."):
+    stream = events(described=False)
+    for item in stream:
+        if item["type"] == "result":
+            item["contract"] = {"states": states, "quote": quote,
+                                "url": "https://example.readthedocs.io/api.html",
+                                "title": "API reference"}
+    return collect(stream)
+
+
+def test_documentation_describing_the_removed_behaviour_is_prominent():
+    body = render(_with_contract("old"))
+    assert "documentation describes the behaviour this change removes" in body
+    assert "defaults to no waiting" in body
+    assert "example.readthedocs.io" in body
+
+
+def test_documentation_describing_the_new_behaviour_softens_rather_than_alarms():
+    body = render(_with_contract("new"))
+    assert "may be intended" in body
+    assert "describes the behaviour this change removes" not in body
+
+
+def test_no_documentation_adds_nothing():
+    body = render(collect(events(described=False)))
+    assert "documentation" not in body.lower()

@@ -33,6 +33,7 @@ class Finding:
     described: bool | None = None
     summary: str = ""
     witnesses: list = field(default_factory=list)
+    contract: dict | None = None
 
     @property
     def undescribed(self) -> bool:
@@ -87,6 +88,7 @@ def collect(events) -> Report:
                     described=event.get("described"),
                     summary=event.get("summary", ""),
                     witnesses=divergences,
+                    contract=event.get("contract"),
                 ))
         elif kind == "verdict":
             report.functions = event.get("functions", 0)
@@ -101,6 +103,35 @@ def _witness(divergence: dict) -> str:
     return (f"{divergence['input']}\n"
             f"# before:  {divergence['before']}\n"
             f"# after:   {divergence['after']}")
+
+
+def _contract_lines(finding) -> list:
+    """Whether the project's own documentation speaks to the old behaviour.
+
+    "Behaviour changed" in an undocumented internal helper is a curiosity. The
+    same difference in something the documentation specifies is a promise the
+    project made to its users and is about to break, and that is a different
+    conversation in review.
+    """
+    found = finding.contract
+    if not found or not found.get("quote"):
+        return []
+    citation = f"> — [{found.get('title') or 'documentation'}]({found['url']})"
+    if found.get("states") == "old":
+        return [
+            "**The published documentation describes the behaviour this change "
+            "removes.**",
+            "",
+            f"> {found['quote']}",
+            citation,
+            "",
+        ]
+    return [
+        f"<sub>The documentation already describes the new behaviour "
+        f"([{found.get('title') or 'source'}]({found['url']})), so this may be "
+        f"intended.</sub>",
+        "",
+    ]
 
 
 def _pin_block(findings: list, slug: str) -> str:
@@ -171,6 +202,7 @@ def render(report: Report, limit: int = 3) -> str:
         if finding.summary:
             lines.append(f"> {finding.summary}")
             lines.append("")
+        lines += _contract_lines(finding)
         lines.append("```python")
         for divergence in finding.witnesses[:limit]:
             lines.append(_witness(divergence))

@@ -517,6 +517,35 @@ Two rules, both about trust rather than capability:
 
 A run costs about half a cent.
 
+### Was the old behaviour promised to anyone?
+
+"Behaviour changed" in an undocumented internal helper is a curiosity. The same
+difference in something the project's own documentation specifies is a promise
+about to be broken, and that is a different conversation in review.
+
+That question is answered by text outside the repository — published
+documentation, changelogs, issue threads — so **Tavily** fetches it, and the
+comment escalates only when the documentation describes the behaviour being
+removed:
+
+> **The published documentation describes the behaviour this change removes.**
+>
+> > If `wait` is not supplied, no delay is applied between attempts.
+> > — [API reference](https://example.readthedocs.io/api.html)
+
+The obvious failure mode of asking a model about retrieved text is that it
+paraphrases something the page does not say, and attaching a link makes that
+worse rather than better: it dresses an invention as evidence. So the model must
+return a sentence copied verbatim, and **that sentence is checked against the
+page it came from**. If it is not there, the finding is dropped entirely — the
+same rule as everywhere else here, that a claim which cannot be checked against
+something observed is not reported.
+
+Set `TAVILY_API_KEY` to enable it. Without it the step is skipped and the witness
+is exactly as strong as it was; a search that fails or finds nothing costs the
+report nothing, because this escalates a finding and is never a dependency of
+one.
+
 ### Keeping what it found
 
 A finding is a moment. Somebody reads it, decides the new behaviour is what they

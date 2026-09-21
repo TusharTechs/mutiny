@@ -20,6 +20,13 @@ inputs:
       `permissions: pull-requests: write` on the job.
     required: false
     default: ${{ github.token }}
+  tavily-api-key:
+    description: >-
+      Optional. When set, a behaviour change the pull request does not mention
+      is checked against the project's published documentation, and the comment
+      says so if the documentation describes the behaviour being removed.
+    required: false
+    default: ""
   comment-on:
     description: >-
       When to comment: `undescribed` (default) speaks only when a behaviour
@@ -60,6 +67,7 @@ runs:
         # Posts the comment, and lifts GitHub's anonymous rate limit while
         # reading the change.
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        TAVILY_API_KEY: ${{ inputs.tavily-api-key }}
       run: >-
         mutiny review-pr
         --comment-on "${{ inputs.comment-on }}"

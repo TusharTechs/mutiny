@@ -183,6 +183,17 @@ class Render:
             for line in _wrap(e["summary"], 76):
                 print(f"    {c['bold']}{line}{c['reset']}")
             print()
+        found = e.get("contract")
+        if found and found.get("quote"):
+            if found.get("states") == "old":
+                print(f"    {c['red']}{c['bold']}The documentation describes the "
+                      f"behaviour this removes:{c['reset']}")
+            else:
+                print(f"    {c['dim']}The documentation already describes the new "
+                      f"behaviour:{c['reset']}")
+            for line in _wrap(f'"{found["quote"]}"', 74):
+                print(f"      {line}")
+            print(f"      {c['dim']}{found['url']}{c['reset']}\n")
         for d in e["divergences"][: self.show]:
             print(f"    {c['dim']}{d['input']}{c['reset']}")
             before, after = _emphasise(str(d["before"]), str(d["after"]), c)

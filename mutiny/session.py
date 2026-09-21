@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from . import refactor as refactor_mod
+from . import contract as contract_mod
 from . import remote
 from . import review as review_mod
 from .diff import hunk_between
@@ -330,7 +331,7 @@ def _verify_review(
             overlay=overlay, diff_text=hunk_text(target.path),
             probes=probes, forks=forks, use_sandbox=True, python=python,
             started=started, opening=opening, archive=None, executor=executor,
-            emit_verdict=False, sink=sink, intent=intent,
+            emit_verdict=False, sink=sink, intent=intent, slug=repo_name,
         ):
             if event.get("type") == "status" and parallel > 1:
                 # Say which function it is about, now that several are in flight.
@@ -548,7 +549,7 @@ def _probe_and_compare(
     *, client, repo, module, qualname, base_source, overlay, diff_text,
     probes, forks, use_sandbox, python, started, opening, archive,
     executor: SandboxExecutor | None = None, emit_verdict: bool = True,
-    sink: dict[str, Any] | None = None, intent: str = "",
+    sink: dict[str, Any] | None = None, intent: str = "", slug: str = "",
 ) -> Iterator[Event]:
     if executor is None and use_sandbox:
         ok, why = available()
@@ -648,6 +649,7 @@ def _probe_and_compare(
         for d in divergences
     ]
     summary, headline, described = "", "", None
+    contract: dict | None = None
     if payload:
         yield _event("status", stage="explain",
                      text=("checking the difference against what the change says"
@@ -657,11 +659,23 @@ def _probe_and_compare(
         headline = explanation.headline
         described = explanation.described
 
+        # Only where it escalates something: "behaviour changed" becomes
+        # "behaviour changed, and the documentation promised the old one".
+        if described is False and contract_mod.available():
+            yield _event("status", stage="explain",
+                         text="checking whether the documentation specifies this")
+            found = contract_mod.documented(
+                client, slug=slug or repo_name, qualname=qualname,
+                summary=summary, witnesses=payload)
+            if found is not None:
+                contract = {"states": found.states, "quote": found.quote,
+                            "url": found.url, "title": found.title}
+
     if sink is not None:
         sink["divergences"] = payload
     yield _event("result", function=qualname, module=module, divergences=payload,
                  agreed=agreed, probes=len(generated), summary=summary,
-                 headline=headline, described=described)
+                 headline=headline, described=described, contract=contract)
 
     if emit_verdict:
         yield _event("verdict", changed=bool(divergences), functions=1,

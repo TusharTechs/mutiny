@@ -23,3 +23,4 @@ jobs:
         with:
           nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
           nebius-project-id: ${{ secrets.NEBIUS_PROJECT_ID }}
+          tavily-api-key: ${{ secrets.TAVILY_API_KEY }}
