@@ -39,13 +39,11 @@ def _is_source(path: str) -> bool:
     if not path.endswith(".py"):
         return False
     parts = Path(path).parts
-    lowered = [part.lower() for part in parts[:-1]]
-    if any(part in TEST_DIRS for part in lowered):
-        return False
-    if any(part in NOT_LIBRARY_DIRS for part in lowered):
+    directories = {part.lower() for part in parts[:-1]}
+    if directories & (TEST_DIRS | NOT_LIBRARY_DIRS):
         return False
     name = parts[-1].lower()
-    if name in NOT_LIBRARY_FILES:
+    if any(name.endswith(excluded) for excluded in NOT_LIBRARY_FILES):
         return False
     return not (name.startswith("test_") or name.endswith("_test.py"))
 
