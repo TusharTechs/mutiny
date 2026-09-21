@@ -1,0 +1,68 @@
+name: "MUTINY"
+description: >-
+  Run both versions of a pull request on generated inputs and comment only when
+  behaviour changed in a way the change does not mention.
+author: "Tushar Agarwal"
+branding:
+  icon: "git-branch"
+  color: "green"
+
+inputs:
+  nebius-api-key:
+    description: "Nebius Token Factory API key."
+    required: true
+  nebius-project-id:
+    description: "Nebius project id, required for Sandboxes."
+    required: true
+  github-token:
+    description: >-
+      Token used to post the comment. The default needs
+      `permissions: pull-requests: write` on the job.
+    required: false
+    default: ${{ github.token }}
+  comment-on:
+    description: >-
+      When to comment: `undescribed` (default) speaks only when a behaviour
+      change is one the pull request does not mention; `any` always reports;
+      `never` writes to the run summary only.
+    required: false
+    default: "undescribed"
+  probes:
+    description: "Inputs to generate per function."
+    required: false
+    default: "20"
+  max-functions:
+    description: "How many changed functions to check."
+    required: false
+    default: "6"
+  cap-usd:
+    description: "Ceiling on model spend for one run."
+    required: false
+    default: "1.0"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install MUTINY
+      shell: bash
+      run: pip install --quiet "${{ github.action_path }}"
+
+    - name: Check this pull request
+      shell: bash
+      env:
+        NEBIUS_API_KEY: ${{ inputs.nebius-api-key }}
+        NEBIUS_PROJECT_ID: ${{ inputs.nebius-project-id }}
+        # Posts the comment, and lifts GitHub's anonymous rate limit while
+        # reading the change.
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: >-
+        mutiny review-pr
+        --comment-on "${{ inputs.comment-on }}"
+        --probes "${{ inputs.probes }}"
+        --max-functions "${{ inputs.max-functions }}"
+        --cap "${{ inputs.cap-usd }}"

@@ -262,6 +262,51 @@ def doctor(_args: argparse.Namespace) -> int:
     return 0 if ok and have_nebius() else 1
 
 
+def review_pr(args: argparse.Namespace) -> int:
+    """Check the pull request this run is about, and comment only if it matters.
+
+    Exit status is 0 whether or not a difference was found. A behaviour
+    difference is information for a reviewer to weigh, not a verdict, and a bot
+    that fails builds on its own judgement is switched off within a week.
+    """
+    from . import ci
+    from .report import collect, render
+
+    if args.url:
+        url = args.url
+        context = None
+    else:
+        try:
+            context = ci.context()
+        except ci.CIError as exc:
+            print(f"mutiny: {exc}")
+            return 1
+        url = context.url
+
+    print(f"mutiny: checking {url}")
+    report = collect(run_url(url, probes=args.probes, forks=args.forks,
+                             cap=args.cap, max_functions=args.max_functions))
+    body = render(report)
+    speak = report.worth_saying(args.comment_on)
+
+    print(f"\n{body}\n")
+    ci.summary(body)
+
+    if context is None:
+        print("mutiny: not running in a pull request, so nothing was posted")
+        return 0
+    if not context.token:
+        print("mutiny: no GITHUB_TOKEN, so nothing was posted")
+        return 0
+    try:
+        print(f"mutiny: {ci.publish(context, body, speak=speak)}")
+    except ci.CIError as exc:
+        # Failing the build because a comment could not be posted would be the
+        # tool getting in the way of the work it is meant to support.
+        print(f"mutiny: could not post the comment — {exc}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mutiny",
@@ -300,6 +345,20 @@ def main(argv: list[str] | None = None) -> int:
     u.add_argument("--max-functions", type=int, default=6)
     common(u)
     u.set_defaults(func=verify_url)
+
+    c = sub.add_parser("review-pr",
+                       help="check the pull request this CI run is about")
+    c.add_argument("--url", default="",
+                   help="check this pull request instead of the one in the environment")
+    c.add_argument("--comment-on", default="undescribed",
+                   choices=("undescribed", "any", "never"),
+                   help="when to post: only undescribed changes (default), "
+                        "every result, or never")
+    c.add_argument("--probes", type=int, default=20)
+    c.add_argument("--forks", type=int, default=8)
+    c.add_argument("--max-functions", type=int, default=6)
+    c.add_argument("--cap", type=float, default=1.0)
+    c.set_defaults(func=review_pr)
 
     d = sub.add_parser("doctor", help="check credentials, models and sandbox access")
     d.set_defaults(func=doctor)

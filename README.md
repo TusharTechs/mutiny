@@ -453,6 +453,70 @@ failures the exception type and normalised message. Memory addresses are
 stripped, unordered containers are sorted, and the hash seed is pinned — because
 an observation that varies for reasons the caller cannot control is not evidence.
 
+## Run it on every pull request
+
+Review happens in the pull request. A tool that lives anywhere else is one
+somebody has to remember, and a tool that usually has nothing to say is one they
+stop remembering.
+
+```yaml
+# .github/workflows/mutiny.yml
+name: MUTINY
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  behaviour:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: TusharTechs/mutiny@main
+        with:
+          nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
+          nebius-project-id: ${{ secrets.NEBIUS_PROJECT_ID }}
+```
+
+It says nothing on most pull requests, and that is the point. Of 49 merged pull
+requests measured in [`docs/findings-pull-requests.md`](docs/findings-pull-requests.md),
+twelve changed behaviour and ten of those were changes the author had already
+announced in the title. Reporting those is noise wearing the costume of
+diligence. The comment appears when a behaviour difference is one the change
+does not mention:
+
+> ### This change alters behaviour it does not mention
+>
+> #### `BaseRetrying._run_wait`
+>
+> 4 of 10 generated inputs produce a different result before and after this change.
+>
+> > When `self.wait` is a non-callable value such as `None`, `0`, an empty list
+> > or `False`, `_run_wait` previously set `upcoming_sleep` to `0.0` without
+> > error, but now it attempts to call `self.wait(retry_state)` and raises.
+>
+> ```python
+> r = Retrying(wait=None); rs = RetryCallState(r, None, (), {}); r._run_wait(rs)
+> # before:  None
+> # after:   TypeError: 'NoneType' object is not callable
+> ```
+
+Two rules, both about trust rather than capability:
+
+- **It never fails a build.** A behaviour difference is information a reviewer
+  weighs, not a verdict. A bot that blocks merges on its own judgement is
+  switched off within a week.
+- **One comment per pull request, edited in place.** Pushing a fix replaces the
+  warning rather than leaving it standing above a correction nobody scrolls to.
+
+| input | |
+|---|---|
+| `comment-on` | `undescribed` (default), `any`, or `never` — `never` still writes the run summary |
+| `probes` | inputs generated per function, default 20 |
+| `max-functions` | changed functions to check, default 6 |
+| `cap-usd` | ceiling on model spend for one run, default 1.00 |
+
+A run costs about half a cent.
+
 ## What it does not do
 
 - **Side effects are invisible.** A function that mutates its argument or writes
