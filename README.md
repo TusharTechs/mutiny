@@ -7,10 +7,39 @@
 <p align="center"><b>Did that refactor actually preserve behaviour?</b></p>
 
 <p align="center">
-  <a href="https://mutiny-verify.vercel.app">Live demo</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#results">Results</a>
+  <a href="https://youtu.be/rEXkEmhaqmc"><b>Demo video, 3 min</b></a> &nbsp;·&nbsp;
+  <a href="https://mutiny-verify.vercel.app"><b>Live demo</b></a> &nbsp;·&nbsp;
+  <a href="#architecture">Architecture</a> &nbsp;·&nbsp;
+  <a href="#results">Results</a> &nbsp;·&nbsp;
+  <a href="#setup">Run it yourself</a>
 </p>
+
+<p align="center">
+  <img alt="Licence Apache 2.0" src="https://img.shields.io/badge/licence-Apache%202.0-4ecdc4">
+  <img alt="Python 3.11 or newer" src="https://img.shields.io/badge/python-3.11%2B-4ecdc4">
+  <img alt="106 tests passing" src="https://img.shields.io/badge/tests-106%20passing-5ac77e">
+</p>
+
+<p align="center">
+  <sub>Built for the Nebius x NVIDIA Global AI Hackathon 2026 &nbsp;·&nbsp; Coding and Agentic Engineering track</sub>
+</p>
+
+---
+
+### For judges
+
+| Looking for | Go to |
+|---|---|
+| How NVIDIA Nemotron is used | [How NVIDIA Nemotron is used](#how-nvidia-nemotron-is-used), then the measured comparison of all four variants |
+| Where Token Factory accelerated the work | [Where Token Factory accelerated the work](#where-token-factory-accelerated-the-work) |
+| Other Nebius tools and services | [Nebius Sandboxes](#nebius-sandboxes), checkpoint forking, 40 isolated microVMs in 3.7s |
+| Tavily | [Was the old behaviour promised to anyone?](#was-the-old-behaviour-promised-to-anyone) |
+| Does it actually work | [Results](#results), 49 merged pull requests nobody chose for our benefit |
+| What it gets **wrong** | [`docs/findings-limits.md`](docs/findings-limits.md), six classes of false finding and one public retraction |
+| Running it yourself | [Setup](#setup), macOS, Linux and Windows |
+| It running on a real PR | [the comment it left on pull request #1](https://github.com/TusharTechs/mutiny/pull/1) |
+
+---
 
 An agent rewrites your function. The tests pass. MUTINY runs both versions on
 hundreds of generated inputs and shows you the exact input where they disagree —
@@ -278,25 +307,60 @@ demonstration does not need it.
 
 ## Setup
 
+Python 3.11 or newer. No other system dependency: MUTINY talks to GitHub over
+HTTPS, so a local `git` is optional, and the code under review is installed and
+executed inside a Nebius sandbox rather than on your machine.
+
+**macOS and Linux**
+
 ```bash
-uv venv --python 3.12 .venv
-uv pip install -e ".[dev]" --python .venv/bin/python
-cp .env.example .env          # add NEBIUS_API_KEY and NEBIUS_PROJECT_ID
+git clone https://github.com/TusharTechs/mutiny.git
+cd mutiny
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+cp .env.example .env            # then add NEBIUS_API_KEY and NEBIUS_PROJECT_ID
 .venv/bin/python scripts/doctor.py
 ```
 
-`doctor.py` verifies connectivity, credentials, model availability and spend.
-Run it first whenever anything fails.
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/TusharTechs/mutiny.git
+cd mutiny
+py -3 -m venv .venv
+.venv\Scripts\python -m pip install -e ".[dev]"
+Copy-Item .env.example .env     # then add NEBIUS_API_KEY and NEBIUS_PROJECT_ID
+.venv\Scripts\python scripts\doctor.py
+```
+
+If you use [uv](https://docs.astral.sh/uv/), `uv venv --python 3.12 .venv` and
+`uv pip install -e ".[dev]"` do the same thing faster. It is not required.
+
+`doctor.py` checks connectivity, credentials, model availability and remaining
+spend, and prints what is wrong rather than failing silently. Run it first
+whenever anything misbehaves.
+
+Then, on any platform:
+
+```bash
+mutiny verify-url https://github.com/python-semver/python-semver/pull/401
+```
 
 ### Reproducing the results
 
-The benchmarks clone three real repositories and run against their history:
+The benchmarks clone real repositories and run against their history. Paths
+below use the POSIX form; on Windows substitute `.venv\Scripts\python`.
 
 ```bash
+.venv/bin/python -m pytest tests/ -q             # 106 tests, no network needed
 .venv/bin/python experiments/refactor/run.py     # agent refactor safety
 .venv/bin/python experiments/diff/scaled.py 8    # detection on real fix commits
-.venv/bin/python -m pytest tests/ -q             # 52 tests
+.venv/bin/python experiments/prs/run.py          # the 49 merged pull requests
 ```
+
+`experiments/prs/run.py` caches GitHub API responses under
+`experiments/prs/cache/`, which is not committed. The first run repopulates it;
+set `GITHUB_TOKEN` to lift the 60 requests per hour anonymous limit.
 
 ## Architecture
 
@@ -441,7 +505,7 @@ Model choice here is decided by the *shape* of the task, not by parameter count.
 | `mutiny/models.py` | Token Factory client: per-run spend cap, ledger, caching, retry |
 | `mutiny/budget.py` | what a public deployment is allowed to spend |
 | `mutiny/fetch.py` | git clone, for local experiments that have git |
-| `mutiny/tls.py` | reactive certificate-trust repair for inspecting proxies |
+| `mutiny/tls.py` | reactive certificate trust repair for private certificate authorities |
 | `mutiny/cli.py` | terminal rendering of the event stream |
 | `app/` | the web interface — the same events over server-sent events |
 
