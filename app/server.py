@@ -25,12 +25,21 @@ from mutiny.session import verify_url
 
 ROOT = Path(__file__).resolve().parent
 
-# The first card has to be the case the tool exists for. The earlier set led
-# with a bug fix, which the intent check now correctly labels "as described" --
-# a visitor clicked through four examples and saw three null results and one
-# change that the pull request had already announced, and learned nothing about
-# why they would want this.
+# The first card has to be the case the tool exists for, and it should not be
+# our own code. python-semver#401 is somebody else's merged pull request whose
+# description says it makes two functions consistent, and which silently stopped
+# accepting an input the previous code explicitly handled. Nothing about it was
+# arranged by us, which is the whole point.
 EXAMPLES = [
+    {
+        "id": "semver-max-ver",
+        "title": "A merged refactor that dropped an input",
+        "blurb": "\"Use max() and min(). This makes the two functions "
+                 "consistent.\" The old code explicitly accepted Version "
+                 "objects. The new one-liner raises on them.",
+        "shows": "a behaviour change the pull request does not mention",
+        "url": "https://github.com/python-semver/python-semver/pull/401",
+    },
     {
         "id": "tenacity-truthiness",
         "title": "A refactor that wasn't",
@@ -54,14 +63,6 @@ EXAMPLES = [
                  "agrees across both versions. Silence is the harder result.",
         "shows": "no behaviour change",
         "url": "https://github.com/Textualize/rich",
-    },
-    {
-        "id": "django",
-        "title": "Django, 2932 files",
-        "blurb": "Installed and executed in a Nebius sandbox, never on this "
-                 "server. Real frameworks, not a toy repository.",
-        "shows": "that this works at scale",
-        "url": "https://github.com/django/django",
     },
 ]
 

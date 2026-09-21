@@ -486,19 +486,25 @@ does not mention:
 
 > ### This change alters behaviour it does not mention
 >
-> #### `BaseRetrying._run_wait`
+> #### `max_ver`
 >
-> 4 of 10 generated inputs produce a different result before and after this change.
+> 5 of 11 generated inputs produce a different result before and after this change.
 >
-> > When `self.wait` is a non-callable value such as `None`, `0`, an empty list
-> > or `False`, `_run_wait` previously set `upcoming_sleep` to `0.0` without
-> > error, but now it attempts to call `self.wait(retry_state)` and raises.
+> > `max_ver` now raises `TypeError` whenever either argument is already a
+> > `Version` instance, because it calls `Version.parse` on it. Previously the
+> > function accepted both strings and `Version` objects.
 >
 > ```python
-> r = Retrying(wait=None); rs = RetryCallState(r, None, (), {}); r._run_wait(rs)
-> # before:  None
-> # after:   TypeError: 'NoneType' object is not callable
+> max_ver(Version.parse("1.0.0"), Version.parse("1.0.0"))
+> # before:  '1.0.0'
+> # after:   TypeError: not expecting type '<class 'semver.version.Version'>'
 > ```
+
+That one is real and merged. [`python-semver#401`](https://github.com/python-semver/python-semver/pull/401)
+is titled *"Simplify max_ver and min_ver"*, and its description says it uses
+`max()` and `min()` to make the two functions consistent. The code it replaced
+had an explicit `elif not isinstance(ver1, Version)` branch — it accepted
+`Version` objects deliberately. The one-line replacement does not.
 
 Two rules, both about trust rather than capability:
 
