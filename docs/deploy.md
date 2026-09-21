@@ -34,6 +34,29 @@ between requests, so without a shared store the total-spend counter resets
 whenever a new instance starts and only the per-run cap is really enforced. With
 them, the ceiling is real. Upstash's free tier is enough and needs no card.
 
+### Turning the ceiling on
+
+1. Create a free Redis database at **console.upstash.com** — any region; pick the
+   one nearest the deployment.
+2. On the database page, copy `UPSTASH_REDIS_REST_URL` and
+   `UPSTASH_REDIS_REST_TOKEN` from the **REST API** panel.
+3. Add both in Vercel → Settings → Environment Variables, then redeploy.
+
+Confirm it took effect rather than assuming it did:
+
+    curl -s https://<your-deployment>/api/health
+
+`cap_enforced` is `true` only when the shared counter actually answers. A cap
+that quietly does nothing is worse than no cap, because it is believed.
+
+Two details worth knowing:
+
+- **A run is charged before it starts**, then corrected once its real cost is
+  known. Cost is only knowable at the end, and a counter updated only then lets
+  any number of simultaneous runs read the same total and all pass the check.
+- **A store that is unreachable does not take the demo down.** The per-run cap
+  and the per-address rate limit still apply, and `cap_enforced` reports false.
+
 ## Deploying
 
 Import the repository at vercel.com/new. Vercel detects the entrypoint named by

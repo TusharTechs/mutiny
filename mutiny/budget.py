@@ -32,6 +32,10 @@ PER_RUN_USD = float(os.environ.get("MUTINY_RUN_CAP_USD", "0.25"))
 # button down. Runs take half a minute, so this is generous.
 RUNS_PER_HOUR = int(os.environ.get("MUTINY_RUNS_PER_HOUR", "20"))
 
+# Charged before a run starts and corrected when it finishes. A measured run is
+# about half a cent; this is deliberately above that.
+TYPICAL_RUN_USD = float(os.environ.get("MUTINY_TYPICAL_RUN_USD", "0.02"))
+
 TIMEOUT = 5
 _local = threading.Lock()
 _spent = 0.0
@@ -48,15 +52,24 @@ class Decision:
         return self.allowed
 
 
-def _redis(*path: str) -> float | None:
-    """Call the Upstash REST API. Returns None when it is not configured."""
+def _redis(*command: str) -> float | None:
+    """Run one Redis command over Upstash's REST API.
+
+    The command goes in the body as a JSON array rather than in the URL path.
+    Both forms exist; the path form needs its arguments URL-encoded, and a key
+    like `mutiny:spent` then depends on the service decoding `%3A` back to a
+    colon. Writing to the wrong key would not fail — it would silently keep a
+    second counter that nothing ever reads, which is the failure this whole
+    module exists to prevent.
+    """
     url, token = (os.environ.get("UPSTASH_REDIS_REST_URL"),
                   os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
     if not url or not token:
         return None
     request = urllib.request.Request(
-        url.rstrip("/") + "/" + "/".join(urllib.parse.quote(p, safe="") for p in path),
-        headers={"Authorization": f"Bearer {token}"})
+        url.rstrip("/"), data=json.dumps(list(command)).encode(), method="POST",
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": "application/json"})
     try:
         context = ssl.create_default_context(
             cafile=os.environ.get("SSL_CERT_FILE") or None)
@@ -67,6 +80,18 @@ def _redis(*path: str) -> float | None:
         # A budget store that is down must not take the demo down with it. The
         # per-run cap still applies.
         return None
+
+
+def shared() -> bool:
+    """Is the ceiling actually enforced, or only the per-run cap?
+
+    Worth being able to answer from outside. Without a shared store the counter
+    resets whenever a new serverless instance starts, and a cap that quietly
+    does nothing is worse than no cap, because it is believed.
+    """
+    return _redis("ping") is not None or bool(
+        os.environ.get("UPSTASH_REDIS_REST_URL")
+        and os.environ.get("UPSTASH_REDIS_REST_TOKEN"))
 
 
 def spent() -> float:
@@ -85,6 +110,30 @@ def record(usd: float) -> None:
     if _redis("incrbyfloat", "mutiny:spent", f"{usd:.6f}") is None:
         with _local:
             _spent += usd
+
+
+def reserve() -> float:
+    """Charge an estimate up front, before the run starts.
+
+    Cost is only known when a run finishes, so a counter updated at the end
+    lets any number of simultaneous runs read the same total and all pass the
+    check. Someone holding the button, or a script, spends the ceiling many
+    times over before it notices. Charging first and correcting afterwards
+    bounds that to the number of runs actually in flight.
+    """
+    record(TYPICAL_RUN_USD)
+    return TYPICAL_RUN_USD
+
+
+def settle(actual: float, reserved: float) -> None:
+    """Correct the estimate once the real cost is known."""
+    difference = round(actual - reserved, 6)
+    if abs(difference) < 1e-6:
+        return
+    if _redis("incrbyfloat", "mutiny:spent", f"{difference:.6f}") is None:
+        global _spent
+        with _local:
+            _spent = max(0.0, _spent + difference)
 
 
 def check(client_id: str) -> Decision:

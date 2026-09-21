@@ -90,7 +90,8 @@ def examples() -> dict:
         "examples": EXAMPLES,
         "sandboxes": {"available": ok, "detail": why},
         "budget": {"spent": round(total, 4), "cap": budget.TOTAL_USD,
-                   "exhausted": total >= budget.TOTAL_USD},
+                   "exhausted": total >= budget.TOTAL_USD,
+                   "enforced": budget.shared()},
     }
 
 
@@ -153,13 +154,18 @@ def _run(url: str, caller: str, probes: int, forks: int):
 
     def events():
         yield {"type": "status", "stage": "fetch", "text": "fetching from GitHub"}
+        # Charged up front so simultaneous runs cannot all read the same total
+        # and all pass the check; corrected below once the real cost is known.
+        reserved = budget.reserve()
         spend = 0.0
-        for event in verify_url(url, probes=min(probes, 40), forks=min(forks, 16),
-                                cap=budget.PER_RUN_USD):
-            if event.get("type") == "verdict":
-                spend = float(event.get("cost") or 0)
-            yield event
-        budget.record(spend)
+        try:
+            for event in verify_url(url, probes=min(probes, 40),
+                                    forks=min(forks, 16), cap=budget.PER_RUN_USD):
+                if event.get("type") == "verdict":
+                    spend = float(event.get("cost") or 0)
+                yield event
+        finally:
+            budget.settle(spend, reserved)
     return events
 
 
@@ -207,6 +213,9 @@ def health() -> dict:
     ok, why = available()
     return {"ok": True, "sandboxes": ok, "detail": why,
             "spent": round(budget.spent(), 4), "cap": budget.TOTAL_USD,
+            # Whether the ceiling is real or only per-run. A cap that quietly
+            # does nothing is worse than no cap, because it is believed.
+            "cap_enforced": budget.shared(),
             "state": str(paths.state(".cache"))}
 
 
