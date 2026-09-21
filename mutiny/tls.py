@@ -1,26 +1,25 @@
-"""Make TLS work behind a corporate inspecting proxy, once, for everything.
+"""Make TLS work when the machine trusts a certificate authority certifi does not.
 
-A TLS-inspecting middlebox terminates the connection and re-signs it with a
-certificate authority that only the machine's own trust store knows about. curl
-works because the macOS keychain has that CA; Python, Node, uv and requests do
-not consult the keychain, so they fail with ``CERTIFICATE_VERIFY_FAILED`` on
-every outbound call.
+Some networks terminate TLS at a middlebox and re-sign it with a private
+certificate authority; some machines carry private roots for other reasons.
+Either way those roots live in the operating system's trust store. curl consults
+it. Python, Node and uv ship their own bundle and do not, so they fail with
+``CERTIFICATE_VERIFY_FAILED`` on every outbound call while curl succeeds.
 
-The fix is one merged bundle — certifi's public roots plus whatever the admin
-installed locally — exported to a file and pointed at via the environment
-variables each toolchain reads.
+The fix is one merged bundle, certifi's public roots plus whatever the system
+trust store already holds, exported to a file and pointed at through the
+environment variables each toolchain reads.
 
 Nothing here runs on import. Rewriting a process's trust configuration as a side
 effect of importing a library is invasive, and on a machine that never needed it
-we would be replacing a working system trust store with one we assembled. So the
-repair is reactive: call ``repair(exc)`` when a request actually fails
-verification, and it builds the bundle, exports it, and reports whether a retry
-is worth attempting. Entry points that want it eagerly can still call ``apply()``
-directly.
+we would be replacing a working trust store with one we assembled. So the repair
+is reactive: call ``repair(exc)`` when a request actually fails verification, and
+it builds the bundle, exports it, and reports whether a retry is worth
+attempting. Entry points that want it eagerly can still call ``apply()``.
 
-Deliberately *not* hardcoding the proxy's CA names: they differ per vendor and
-get rotated. Everything in the system keychain is admin-installed by definition,
-so taking all of it is both more general and more robust.
+Deliberately *not* hardcoding any CA names: they differ per vendor and get
+rotated. Taking everything the system already trusts is both more general and
+more robust.
 """
 from __future__ import annotations
 
@@ -65,7 +64,7 @@ _MACOS_KEYCHAINS = (
 
 
 def _system_certs() -> str:
-    """PEM for every certificate the machine's admin installed."""
+    """PEM for every certificate already in the system trust store."""
     if platform.system() != "Darwin" or not shutil.which("security"):
         return ""
     chunks = []
