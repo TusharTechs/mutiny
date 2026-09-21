@@ -106,6 +106,21 @@ behaviour is on the path being changed. Do not assume the change is correct.
 
 """
 
+BUILT = """This one line builds a `{owner}`. It was executed before you were
+shown it, so it is known to work:
+
+    {setup}
+
+Begin every expression with it, on the same line, then act on `subject`:
+
+    {setup}; subject.{name}(...)
+
+Each expression must stay on ONE line — use `;` between statements, and no
+`import` — because each is evaluated on its own. Vary what you do to `subject`
+and what you pass. Do not invent a different construction: this one is proven
+and yours may not be.
+"""
+
 RECEIVERS = """`{owner}` may be a base class whose behaviour is only observable
 through a concrete subclass. These are available in this module, and you should
 use them rather than `{owner}` itself unless you are deliberately testing the
@@ -297,6 +312,7 @@ def generate(
     diff: str = "",
     stateful: bool = False,
     awaitable: bool = False,
+    recipe: str = "",
 ) -> list[str]:
     receivers = ""
     if subclasses:
@@ -309,8 +325,11 @@ def generate(
                 module=module, qualname=qualname, source=source, n=n,
                 receivers=receivers,
                 stateful=(
-                    (STATEFUL.format(owner=qualname.rsplit(".", 2)[-2])
-                     if stateful and "." in qualname else "")
+                    (BUILT.format(owner=qualname.rsplit(".", 2)[-2], setup=recipe,
+                                  name=qualname.rsplit(".", 1)[-1])
+                     if recipe and "." in qualname else "")
+                    + (STATEFUL.format(owner=qualname.rsplit(".", 2)[-2])
+                       if stateful and "." in qualname and not recipe else "")
                     + (ASYNC.format(qualname=qualname) if awaitable else "")),
                 change=CHANGE.format(diff=diff[:4000]) if diff else "",
                 extra=(hint + "\n\n") if hint else "")},
@@ -362,6 +381,7 @@ def generate_validated(
     diff: str = "",
     stateful: bool = False,
     awaitable: bool = False,
+    recipe: str = "",
     model: str = SUPER,
     on_progress=None,
 ):
@@ -397,7 +417,8 @@ def generate_validated(
         for _ in range(batches):
             produced += generate(client, module, qualname, source, n=batch, hint=hint,
                                  model=model, subclasses=subclasses, diff=diff,
-                                 stateful=stateful, awaitable=awaitable)
+                                 stateful=stateful, awaitable=awaitable,
+                                 recipe=recipe)
         exprs = [e for e in dict.fromkeys(produced) if e not in seen]
         if not exprs:
             if attempt == rounds:

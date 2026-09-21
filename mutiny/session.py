@@ -24,6 +24,7 @@ from typing import Any
 
 from . import refactor as refactor_mod
 from . import contract as contract_mod
+from .construct import find_recipe
 from . import remote
 from . import review as review_mod
 from .diff import hunk_between
@@ -628,6 +629,33 @@ def _probe_and_compare(
     if "error" in outcome:
         raise outcome["error"]
     generated, _ = outcome["value"]
+
+    # Nothing ran. The usual reason is that the receiver could not be built, and
+    # asking again the same way will fail the same way. Go and work out how to
+    # build it first, proving the answer by running it, then write probes that
+    # start from an object known to exist.
+    owner = qualname.rsplit(".", 2)[-2] if "." in qualname else ""
+    if not generated and owner:
+        yield _event("status", stage="probes",
+                     text=f"no input could build a {owner} — working out how")
+        recipe = find_recipe(
+            client, module=module, owner=owner, source=base_source, repo=repo,
+            probe=lambda e: runner.run(module, e), qualname=qualname)
+        if recipe:
+            yield _event("status", stage="probes",
+                         text=(f"built a {owner} on attempt {recipe.attempts}"
+                               + (f" after reading the {' and '.join(recipe.evidence)}"
+                                  if recipe.evidence else "")))
+            yield _event("recipe", owner=owner, setup=recipe.setup,
+                         attempts=recipe.attempts, evidence=recipe.evidence)
+            generated, _ = generate_validated(
+                client, module, qualname, focused_module(base_source, qualname),
+                probe=lambda e: runner.run(module, e), n=probes,
+                subclasses=receiver_candidates(base_source, qualname),
+                stateful=is_stateful(base_source, qualname),
+                awaitable=is_async(base_source, qualname),
+                diff=diff_text, covering_tests=examples, recipe=recipe.setup,
+            )
     if not generated:
         yield _event("no_probes", function=qualname)
         if sink is not None:

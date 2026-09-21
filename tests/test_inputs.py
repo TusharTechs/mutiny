@@ -24,17 +24,31 @@ class Retrying:
 def test_every_generator_argument_reaches_the_prompt_builder():
     """generate_validated forwards its arguments to generate; they must exist.
 
-    `awaitable` was added to generate_validated and to the call it makes, but
-    not to generate itself. Every test passed — none of them calls generate —
-    and the live site failed on the first pull request with a TypeError.
+    This has now broken twice, identically: `awaitable`, then `recipe`, each
+    added to generate_validated and to the call it makes but not to generate
+    itself. No test calls generate, so the suite stayed green and the failure
+    landed on a live run.
+
+    The first version of this test listed the arguments by hand, which is how it
+    missed the second one. It now reads the call out of the source, so a new
+    argument is covered the moment it is written.
     """
+    import ast
     import inspect
 
     from mutiny.inputs import generate, generate_validated
 
-    forwarded = set(inspect.signature(generate).parameters)
-    for name in ("hint", "model", "subclasses", "diff", "stateful", "awaitable"):
-        assert name in forwarded, f"generate() cannot accept {name!r}"
+    tree = ast.parse(inspect.getsource(generate_validated))
+    forwarded = {
+        keyword.arg
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "generate"
+        for keyword in node.keywords
+        if keyword.arg
+    }
+    assert forwarded, "expected generate_validated to call generate with keywords"
 
-    outer = set(inspect.signature(generate_validated).parameters)
-    assert {"stateful", "awaitable", "diff", "subclasses"} <= outer
+    accepted = set(inspect.signature(generate).parameters)
+    missing = forwarded - accepted
+    assert not missing, f"generate() cannot accept {sorted(missing)}"

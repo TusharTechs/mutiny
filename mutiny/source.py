@@ -107,3 +107,36 @@ def focused_module(
     if end < len(lines):
         out.append(f"\n# ... {len(lines) - end} lines elided ...")
     return "\n".join(out)
+
+
+def class_source(source: str, name: str, max_lines: int = 80) -> str:
+    """A class's signature surface: bases, `__init__`, and what it binds.
+
+    The whole class is usually far too much -- sqlalchemy's InstanceState runs to
+    hundreds of lines -- and almost none of it says how to build one. What a
+    caller needs is the bases, the constructor, and the attributes set on the
+    instance.
+    """
+    tree = ast.parse(source)
+    found = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == name:
+            found = node
+            break
+    if found is None:
+        return ""
+
+    bases = ", ".join(ast.unparse(b) for b in found.bases)
+    lines = [f"class {found.name}({bases}):" if bases else f"class {found.name}:"]
+
+    for statement in found.body:
+        if isinstance(statement, ast.Assign) and len(lines) < max_lines:
+            lines.append("    " + ast.unparse(statement))
+        elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if statement.name == "__init__" or statement.name.startswith("__new__"):
+                body = ast.unparse(statement).splitlines()[:max_lines - len(lines)]
+                lines += ["    " + line for line in body]
+            elif len(lines) < max_lines:
+                args = ast.unparse(statement.args)
+                lines.append(f"    def {statement.name}({args}): ...")
+    return "\n".join(lines[:max_lines])
