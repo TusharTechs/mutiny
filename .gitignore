@@ -9,3 +9,5 @@ experiments/phase1/results/*.json
 experiments/checkouts/
 certs/
 .cache/
+experiments/prs/cache/
+.claude/
