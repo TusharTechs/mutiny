@@ -219,9 +219,9 @@ def repair(exc: BaseException) -> bool:
     import sys
 
     print(
-        f"mutiny: certificate verification failed, which usually means a "
-        f"TLS-inspecting proxy. Rebuilt {bundle} with {count()} certificates "
-        f"and retrying.",
+        f"mutiny: certificate verification failed against certifi's roots. "
+        f"Rebuilt {bundle} from the system trust store with {count()} "
+        f"certificates and retrying.",
         file=sys.stderr,
     )
     return True
