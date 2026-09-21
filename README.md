@@ -21,6 +21,12 @@
 </p>
 
 <p align="center">
+  <sub>Evidence, captured from real runs:
+  <a href="#where-token-factory-accelerated-the-work">running on Token Factory</a> &nbsp;·&nbsp;
+  <a href="#was-the-old-behaviour-promised-to-anyone">the Tavily documentation check</a></sub>
+</p>
+
+<p align="center">
   <sub>Built for the Nebius x NVIDIA Global AI Hackathon 2026 &nbsp;·&nbsp; Coding and Agentic Engineering track</sub>
 </p>
 
@@ -31,9 +37,9 @@
 | Looking for | Go to |
 |---|---|
 | How NVIDIA Nemotron is used | [How NVIDIA Nemotron is used](#how-nvidia-nemotron-is-used), then the measured comparison of all four variants |
-| Where Token Factory accelerated the work | [Where Token Factory accelerated the work](#where-token-factory-accelerated-the-work) |
+| Where Token Factory accelerated the work | [Where Token Factory accelerated the work](#where-token-factory-accelerated-the-work), with `doctor` run against a live account |
 | Other Nebius tools and services | [Nebius Sandboxes](#nebius-sandboxes), checkpoint forking, 40 isolated microVMs in 3.7s |
-| Tavily | [Was the old behaviour promised to anyone?](#was-the-old-behaviour-promised-to-anyone) |
+| Tavily | [Was the old behaviour promised to anyone?](#was-the-old-behaviour-promised-to-anyone), a real run quoting the documentation it contradicts |
 | Does it actually work | [Results](#results), 49 merged pull requests nobody chose for our benefit |
 | What it gets **wrong** | [`docs/findings-limits.md`](docs/findings-limits.md), six classes of false finding and one public retraction |
 | Running it yourself | [Setup](#setup), macOS, Linux and Windows |
@@ -163,6 +169,14 @@ failed *worse* than the smaller models when starved of tokens. Bigger was not
 better; the shape of the work decided the model.
 
 ## Where Token Factory accelerated the work
+
+<img src="docs/img/token-factory.png" alt="mutiny doctor: credentials, project and sandboxes healthy, then spend broken down across three Nemotron variants" width="100%">
+
+`mutiny doctor` against a live account: Token Factory credentials, the project
+Sandboxes routes by, and the spend ledger split by model. 1,080 billed calls and
+2,446 more served from cache, for $4.69 across every experiment in this
+repository.
+
 
 - **One OpenAI-compatible endpoint for four models.** Swapping Nano for Super
   for Ultra is a string change, which is what made the comparison table above
@@ -378,30 +392,45 @@ flowchart TB
     RW["<b>refactor.py</b><br/>Nemotron rewrites it"]
     WARM[["<b>Nebius Sandboxes</b><br/>install once · 9.8s"]]
     GEN["<b>inputs.py</b><br/>Nemotron writes probes"]
+    BUILD["<b>construct.py</b><br/>read the class · build a recipe<br/>prove it by running it"]
     BEFORE["<b>before</b>"]
     AFTER["<b>after</b>"]
     CMP["<b>differential.py</b><br/>canonicalise · compare"]
     CONF{"reproduces?"}
+    SAID{"does the change<br/>say so?"}
+    DOC["<b>contract.py</b><br/>Tavily: was it documented?"]
     EXP["<b>explain.py</b><br/>one sentence"]
     OUT(["<b>Witness</b>"])
+    CI["<b>ci.py · report.py</b><br/>one PR comment, edited in place"]
+    PIN["<b>pin.py</b><br/>a test that pins what it saw"]
+    QUIET(["<b>Noted, as described</b>"])
     NONE(["<b>No divergence</b>"])
 
     URL --> REMOTE --> WHAT
     WHAT -- yes --> PR --> WARM
     WHAT -- "no, so make one" --> RW --> WARM
     WARM --> GEN
+    GEN -- "nothing ran" --> BUILD -- "now it can" --> GEN
     GEN -- "40 forks · 3.7s" --> BEFORE --> CMP
     GEN --> AFTER --> CMP
     CMP -- "they differ" --> CONF
     CMP -- "all agreed" --> NONE
-    CONF -- yes --> EXP --> OUT
     CONF -- "flaky, not evidence" --> NONE
+    CONF -- yes --> SAID
+    SAID -- yes --> QUIET
+    SAID -- no --> DOC --> EXP --> OUT
+    OUT --> CI
+    OUT --> PIN
 
     style URL fill:#4ecdc4,stroke:#2a9d94,color:#000
     style WARM fill:#e879f9,stroke:#c026d3,color:#000
     style GEN fill:#fbbf24,stroke:#d97706,color:#000
+    style BUILD fill:#fbbf24,stroke:#d97706,color:#000
     style CONF fill:#fbbf24,stroke:#d97706,color:#000
+    style SAID fill:#fbbf24,stroke:#d97706,color:#000
+    style DOC fill:#8b5cf6,stroke:#6d28d9,color:#fff
     style OUT fill:#e56a6a,stroke:#b83c3c,color:#000
+    style QUIET fill:#8b97a8,stroke:#5d6878,color:#000
     style NONE fill:#5ac77e,stroke:#2f9350,color:#000
 ```
 
@@ -598,10 +627,12 @@ documentation, changelogs, issue threads — so **Tavily** fetches it, and the
 comment escalates only when the documentation describes the behaviour being
 removed:
 
-> **The published documentation describes the behaviour this change removes.**
->
-> > If `wait` is not supplied, no delay is applied between attempts.
-> > — [API reference](https://example.readthedocs.io/api.html)
+<img src="docs/img/tavily.png" alt="A run on python-semver pull request 401: behaviour changed, not described by the change, and the documentation sentence it contradicts, quoted with its source URL" width="100%">
+
+That is a real run on `python-semver#401`. The behaviour change is found by
+execution; Tavily then finds the page that promised the old behaviour, and the
+sentence *"Returns the greater version of two versions strings."* is quoted with
+the URL it came from.
 
 The obvious failure mode of asking a model about retrieved text is that it
 paraphrases something the page does not say, and attaching a link makes that
@@ -660,6 +691,34 @@ wrong reason.
 `docs/findings-differential.md` records the measurements and the retraction in
 full, including a finding we reported internally as the headline result and then
 withdrew when a pinned hash seed showed it was an artifact of our own harness.
+
+## On AI assistance
+
+This is a tool for checking code a model wrote, so being vague about how this
+repository was written would be a strange place to start.
+
+**Claude Code was used as a pair programmer throughout.** Most of the
+implementation was written with it, and most of the debugging was done with it:
+the archive trim that silently dropped `README.md` and surfaced as an import
+error three stages later, the overlay that applied one file of a two file change
+and produced a `TypeError` no released version can raise, the address filter that
+missed `<RetryCallState 140737342193440: ...>` because it carried no ` at `.
+Those were found and fixed in that loop.
+
+**The direction was not.** Which problem was worth solving, what to build and
+what to refuse to build, which experiments would actually settle a question,
+what the measurements meant once they came back, and every call about what this
+should and should not claim: those were mine, and several of them went against
+what the model first suggested. The decision that the model must write inputs
+and never assertions came out of a measurement that said the obvious design did
+not work.
+
+**And none of it is taken on trust.** Every number here is the output of a run
+that can be repeated, every finding carries the input that produced it, and the
+six ways this tool has been confidently wrong are written down in
+[`docs/findings-limits.md`](docs/findings-limits.md) rather than quietly fixed.
+That standard is the whole point of the project, and it applies to how the
+project itself was built.
 
 ## Licence
 
