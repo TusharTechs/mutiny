@@ -7,7 +7,7 @@
 <p align="center"><b>Did that refactor actually preserve behaviour?</b></p>
 
 <p align="center">
-  <a href="https://youtu.be/rEXkEmhaqmc"><b>Demo video, 3 min</b></a> &nbsp;·&nbsp;
+  <a href="https://youtu.be/rEXkEmhaqmc"><b>Demo video</b></a> &nbsp;·&nbsp;
   <a href="https://mutiny-verify.vercel.app"><b>Live demo</b></a> &nbsp;·&nbsp;
   <a href="#architecture">Architecture</a> &nbsp;·&nbsp;
   <a href="#results">Results</a> &nbsp;·&nbsp;
