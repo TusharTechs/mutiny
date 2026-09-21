@@ -155,6 +155,33 @@ def _verbatim(quote: str, sources: list[Source]) -> Source | None:
     return None
 
 
+def _names(slug: str) -> set[str]:
+    """Spellings of this project that could legitimately appear in a doc URL."""
+    repo = slug.split("/")[-1].split("#")[0].lower()
+    owner = slug.split("/")[0].lower() if "/" in slug else ""
+    names = {repo, repo.replace("-", ""), repo.replace("_", "")}
+    # python-semver publishes as `semver`; pytest-cov as `pytest-cov`.
+    for prefix in ("python-", "py-", "python_"):
+        if repo.startswith(prefix):
+            names.add(repo[len(prefix):])
+    if owner:
+        names.add(f"{owner}/{repo}")
+    return {n for n in names if len(n) >= 3}
+
+
+def belongs_to(url: str, slug: str) -> bool:
+    """Is this page plausibly THIS project's documentation?
+
+    Searching for "python-semver Version.compare precedence" returns
+    python-semanticversion, which is a different library with a similar name and
+    a similar API. Quoting its documentation as this project's promise would be
+    a confident, cited, wrong claim -- the exact failure this check exists to
+    avoid, made worse by the citation making it look verified.
+    """
+    address = url.lower()
+    return any(name in address for name in _names(slug))
+
+
 def query_for(slug: str, qualname: str, summary: str) -> str:
     package = slug.split("/")[-1].split("#")[0]
     name = qualname.split(".")[-1]
@@ -172,7 +199,8 @@ def documented(
     model: str = SUPER,
 ) -> Contract | None:
     """Documentation describing the behaviour that changed, if any says so."""
-    sources = search(query_for(slug, qualname, summary))
+    sources = [s for s in search(query_for(slug, qualname, summary))
+               if belongs_to(s.url, slug)]
     if not sources:
         return None
 

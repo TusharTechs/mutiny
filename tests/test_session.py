@@ -92,3 +92,16 @@ def test_overlay_applies_every_changed_file_not_just_the_target(tmp_path):
     assert set(review.paths) == {"pkg/caller.py", "pkg/helper.py"}, (
         "both changed files must be in the overlay set, or the 'after' run is "
         f"a state that never existed: {review.paths}")
+
+
+def test_every_caller_of_probe_and_compare_can_name_the_project():
+    """A NameError here reached a live run.
+
+    _probe_and_compare is reached from three places and only one of them knows
+    the owner/name; the others have a directory. The single-function path is the
+    one no test exercises, so it was the one that broke.
+    """
+    from mutiny.session import _slug_of
+
+    assert _slug_of(Path("/tmp/python-semver")) == "python-semver"
+    assert _slug_of(None) == ""

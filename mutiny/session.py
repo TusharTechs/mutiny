@@ -140,6 +140,7 @@ def verify_function(
     use_sandbox: bool = True,
     python: str | None = None,
     executor: SandboxExecutor | None = None,
+    slug: str = "",
 ) -> Iterator[Event]:
     """Rewrite a function with Nemotron, then check the rewrite preserved behaviour."""
     import sys
@@ -177,6 +178,7 @@ def verify_function(
         diff_text="\n".join(_unified(rewrite.original, applied)),
         probes=probes, forks=forks, use_sandbox=use_sandbox, python=python,
         started=started, opening=opening, archive=None, executor=executor,
+        slug=slug,
     )
 
 
@@ -471,7 +473,8 @@ def _verify_repository(
     for index, target in enumerate(candidates):
         probed = True
         for event in verify_function(path, target, probes=probes,
-                                     forks=forks, cap=cap, executor=executor):
+                                     forks=forks, cap=cap, executor=executor,
+                                     slug=slug):
             if event.get("type") == "no_probes":
                 probed = False
                 remaining = len(candidates) - index - 1
@@ -543,6 +546,19 @@ def _candidate_functions(repo: Path, ceiling: int = 70, limit: int = 6) -> list[
             seen.add(qualname)
             ordered.append(qualname)
     return ordered[:limit]
+
+
+def _slug_of(repo) -> str:
+    """Something to name the project in a documentation search.
+
+    `_probe_and_compare` is reached from three places and only one of them knows
+    the owner/name; the others have a directory. A NameError here reached a live
+    run, because the single-function path is the one no test exercises.
+    """
+    try:
+        return repo.name if repo is not None else ""
+    except AttributeError:
+        return ""
 
 
 def _probe_and_compare(
@@ -659,13 +675,20 @@ def _probe_and_compare(
         headline = explanation.headline
         described = explanation.described
 
-        # Only where it escalates something: "behaviour changed" becomes
+        # Wherever it escalates something: "behaviour changed" becomes
         # "behaviour changed, and the documentation promised the old one".
-        if described is False and contract_mod.available():
+        #
+        # `False` is a change whose description claimed it preserved behaviour.
+        # `None` is a change that described itself not at all -- which is every
+        # rewrite an agent makes. That is the case where the question matters
+        # most: nobody has said whether this was meant, so whether the project
+        # promised the old behaviour is the only external evidence there is.
+        # Only `True`, where the author predicted the difference, is excluded.
+        if described is not True and contract_mod.available():
             yield _event("status", stage="explain",
                          text="checking whether the documentation specifies this")
             found = contract_mod.documented(
-                client, slug=slug or repo_name, qualname=qualname,
+                client, slug=slug or _slug_of(repo), qualname=qualname,
                 summary=summary, witnesses=payload)
             if found is not None:
                 contract = {"states": found.states, "quote": found.quote,

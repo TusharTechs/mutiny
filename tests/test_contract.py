@@ -41,3 +41,54 @@ def test_the_verdict_that_matters_is_the_documented_old_behaviour():
 def test_the_query_names_the_package_and_the_function():
     query = query_for("jd/tenacity#679", "BaseRetrying._run_wait", "wait is called")
     assert "tenacity" in query and "_run_wait" in query
+
+
+def test_a_rewrite_that_describes_itself_not_at_all_is_still_checked():
+    """An agent's rewrite comes with no description, which is not the same as
+    a description saying nothing changed — and is the case where "did the
+    project promise the old behaviour?" is the only external evidence there is.
+    """
+    import inspect
+
+    from mutiny import session
+
+    source = inspect.getsource(session._probe_and_compare)
+    assert "described is not True and contract_mod.available()" in source, (
+        "a change with no description at all must not skip the check")
+
+
+def test_a_similarly_named_library_is_not_this_project():
+    """Searching for python-semver returns python-semanticversion: a different
+    library, similar name, similar API. Quoting its documentation as this
+    project's promise is a wrong claim that a citation makes look verified.
+    """
+    from mutiny.contract import belongs_to
+
+    assert belongs_to("https://python-semver.readthedocs.io/en/latest/usage.html",
+                      "python-semver/python-semver")
+    assert belongs_to("https://pypi.org/project/semver", "python-semver/python-semver")
+    assert belongs_to("https://github.com/python-semver/python-semver",
+                      "python-semver/python-semver")
+    assert not belongs_to(
+        "https://python-semanticversion.readthedocs.io/en/latest/reference.html",
+        "python-semver/python-semver")
+
+
+def test_the_name_check_is_a_floor_and_not_a_guarantee():
+    """Go's semver package shares the name and would pass this test.
+
+    Worth recording honestly rather than implying the check is airtight: it
+    removes the common case of a similarly-named neighbour, and a same-named
+    library in another ecosystem still gets through. The verbatim-quote check
+    is what stops that becoming an invented claim.
+    """
+    from mutiny.contract import belongs_to
+
+    assert belongs_to("https://pkg.go.dev/golang.org/x/mod/semver",
+                      "python-semver/python-semver") is True
+
+
+def test_the_check_survives_a_slug_with_no_owner():
+    from mutiny.contract import belongs_to
+
+    assert belongs_to("https://arrow.readthedocs.io/en/stable/", "arrow")
