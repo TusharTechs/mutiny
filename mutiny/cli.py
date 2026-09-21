@@ -303,6 +303,14 @@ def review_pr(args: argparse.Namespace) -> int:
     print(f"\n{body}\n")
     ci.summary(body)
 
+    if report.error:
+        # A run that could not happen must not look like a run that found
+        # nothing. The first live run of this action reported "nothing to
+        # report, staying quiet" because the credentials were empty, and the
+        # job went green.
+        ci.annotate(f"MUTINY could not check this change: {report.error}")
+        return 0
+
     if context is None:
         print("mutiny: not running in a pull request, so nothing was posted")
         return 0

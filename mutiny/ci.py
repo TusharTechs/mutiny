@@ -140,6 +140,19 @@ def publish(ctx: Context, body: str, *, speak: bool) -> str:
     return "updated the existing comment"
 
 
+def annotate(message: str, level: str = "error") -> None:
+    """Surface a problem on the run itself, where the repository owner looks.
+
+    Exit status stays 0 -- this tool does not fail builds -- so a workflow
+    command is the only way a setup mistake becomes visible. Without it a run
+    that cannot authenticate is indistinguishable from a run that found nothing,
+    which is how the first live run of this action passed while doing nothing.
+    """
+    flattened = " ".join(str(message).split())
+    print(f"::{level} title=MUTINY::{flattened}")
+    summary(f"\n> **MUTINY could not run.** {flattened}\n")
+
+
 def summary(text: str) -> None:
     """Write to the run summary, which needs no token and no permissions."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
