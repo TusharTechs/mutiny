@@ -659,7 +659,7 @@ def _probe_and_compare(
 
     if sink is not None:
         sink["divergences"] = payload
-    yield _event("result", function=qualname, divergences=payload,
+    yield _event("result", function=qualname, module=module, divergences=payload,
                  agreed=agreed, probes=len(generated), summary=summary,
                  headline=headline, described=described)
 

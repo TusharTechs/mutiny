@@ -27,6 +27,7 @@ DOCS = "https://github.com/TusharTechs/mutiny#how-it-works"
 @dataclass
 class Finding:
     function: str
+    module: str = ""
     path: str = ""
     probes: int = 0
     described: bool | None = None
@@ -81,6 +82,7 @@ def collect(events) -> Report:
             if divergences:
                 report.findings.append(Finding(
                     function=event.get("function", ""),
+                    module=event.get("module", ""),
                     probes=event.get("probes", 0),
                     described=event.get("described"),
                     summary=event.get("summary", ""),
@@ -99,6 +101,36 @@ def _witness(divergence: dict) -> str:
     return (f"{divergence['input']}\n"
             f"# before:  {divergence['before']}\n"
             f"# after:   {divergence['after']}")
+
+
+def _pin_block(findings: list, slug: str) -> str:
+    """A test that pins what was observed, ready to keep.
+
+    A finding is a moment: somebody reads it, decides the new behaviour is what
+    they meant, merges, and nothing stops the next refactor from moving it back.
+    """
+    from .pin import pin
+
+    url = f"https://github.com/{slug.replace('#', '/pull/')}" if slug else ""
+    blocks = []
+    for finding in findings:
+        if not finding.module:
+            continue
+        text, count = pin(finding.witnesses, module=finding.module,
+                          qualname=finding.function, side="after", url=url)
+        if count:
+            blocks.append(text.strip())
+    if not blocks:
+        return ""
+
+    joined = "\n\n".join(blocks)
+    return ("<details><summary>Keep this behaviour — a test pinning what was "
+            "observed</summary>\n\n"
+            "If the new behaviour is what you meant, this locks it in so the "
+            "next refactor cannot move it back quietly. Every assertion is a "
+            "value that was observed by running the code, not one a model "
+            "predicted.\n\n"
+            f"```python\n{joined}\n```\n\n</details>")
 
 
 def render(report: Report, limit: int = 3) -> str:
@@ -148,6 +180,11 @@ def render(report: Report, limit: int = 3) -> str:
             lines.append(f"<sub>…and {extra} more "
                          f"input{'' if extra == 1 else 's'} that disagree"
                          f"{'s' if extra == 1 else ''}.</sub>")
+        lines.append("")
+
+    pinned = _pin_block(undescribed, report.slug)
+    if pinned:
+        lines.append(pinned)
         lines.append("")
 
     described = [f for f in report.findings if f.described is True]

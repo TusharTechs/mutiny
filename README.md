@@ -517,6 +517,32 @@ Two rules, both about trust rather than capability:
 
 A run costs about half a cent.
 
+### Keeping what it found
+
+A finding is a moment. Somebody reads it, decides the new behaviour is what they
+meant, merges — and nothing stops the next refactor from moving it back. The
+comment carries a test that pins what was observed, and `mutiny pin` writes one
+directly:
+
+    mutiny pin --url https://github.com/owner/repo/pull/123 --side after
+
+```python
+"""Behaviour pinned by MUTINY from https://github.com/owner/repo/pull/123."""
+from mutiny.diff import _is_source
+
+
+def test_is_source_my_setup_py():
+    assert repr(_is_source('my_setup.py')) == 'False'
+```
+
+This does not break the rule that a model never writes assertions. It doesn't
+write these either: the input was generated, *executed* against both versions,
+and kept only because the two disagreed — and a human chose which side was
+correct before anything was written down. Nothing here is predicted. A value
+that cannot be reproduced faithfully, such as a canonicalised set or an object
+identity, is refused rather than pinned to something that would fail for the
+wrong reason.
+
 ## What it does not do
 
 - **Side effects are invisible.** A function that mutates its argument or writes

@@ -307,6 +307,39 @@ def review_pr(args: argparse.Namespace) -> int:
     return 0
 
 
+def pin_behaviour(args: argparse.Namespace) -> int:
+    """Run a verification and write a test pinning one side of what it found."""
+    from pathlib import Path as _Path
+
+    from .pin import pin
+    from .report import collect
+
+    report = collect(run_url(args.url, probes=args.probes, forks=args.forks,
+                             cap=args.cap, max_functions=args.max_functions))
+    findings = [f for f in report.findings if f.module]
+    if not findings:
+        print("mutiny: nothing to pin — no behaviour difference was found")
+        return 0
+
+    written = 0
+    for finding in findings:
+        text, count = pin(finding.witnesses, module=finding.module,
+                          qualname=finding.function, side=args.side, url=args.url)
+        if not count:
+            continue
+        name = finding.function.replace(".", "_").lower()
+        out = _Path(args.out or f"test_pinned_{name}.py")
+        if len(findings) > 1 and not args.out:
+            out = _Path(f"test_pinned_{name}.py")
+        out.write_text(text, encoding="utf-8")
+        print(f"mutiny: pinned {count} observation(s) of {finding.function} -> {out}")
+        written += count
+    if not written:
+        print("mutiny: nothing could be pinned — every observed value was a "
+              "canonicalised container or an object identity")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mutiny",
@@ -359,6 +392,18 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--max-functions", type=int, default=6)
     c.add_argument("--cap", type=float, default=1.0)
     c.set_defaults(func=review_pr)
+
+    pn = sub.add_parser("pin",
+                        help="write a test pinning the behaviour a run observed")
+    pn.add_argument("--url", required=True, help="the pull request or repository")
+    pn.add_argument("--side", default="after", choices=("before", "after"),
+                    help="which side of the change is correct (default: after)")
+    pn.add_argument("--out", default="", help="file to write")
+    pn.add_argument("--probes", type=int, default=20)
+    pn.add_argument("--forks", type=int, default=8)
+    pn.add_argument("--max-functions", type=int, default=6)
+    pn.add_argument("--cap", type=float, default=1.0)
+    pn.set_defaults(func=pin_behaviour)
 
     d = sub.add_parser("doctor", help="check credentials, models and sandbox access")
     d.set_defaults(func=doctor)
